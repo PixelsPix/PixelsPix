@@ -1,0 +1,19 @@
+<!---
+- 👋 Hi, I’m @PixelsPix
+- 👀 I’m interested in ...
+- 🌱 I’m currently learning ...
+- 💞️ I’m looking to collaborate on ...
+- 📫 How to reach me ...
+- 😄 Pronouns: ...
+- ⚡ Fun fact: ...
+
+PixelsPix/PixelsPix is a ✨ special ✨ repository because its `README.md` (this file) appears on your GitHub profile.
+You can click the Preview link to take a look at your changes.
+--->
+- Hello! I'm @PixelsPix on GitHub!
+- People call me Pixels, even irl, so feel free to call me that as well!
+- I'm interested in numerical simulations, optimization techniques and various interactive visualizations of mathematical and engineering concepts.
+- I'm currently a Mechanical Engineering major, with a great interest in fluid flow and thermodynamics.
+
+I mostly just watch youtube all day tbh, so a fun fact is that I watch youtube all day?
+For now I'm just trying to learn how to code, but if you want to contact me for some reason, please email me at pixiedavina09@gmail.com and I'll reply! ^^
