@@ -3,11 +3,18 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 class Particula:
-    def __init__(self, velocidade_x, velocidade_y, massa) -> None:
-        velocidade_x = velocidade_x
-        velocidade_y = velocidade_y
-        massa = massa
+    def __init__(self, velocidade: float, angulo_velocidade: float, raio: float, massa: float) -> None:
+        self.velocidade = velocidade
+        self.angulo_velocidade = angulo_velocidade
+        self.massa = massa
+        self.raio = raio
 
-        momento_x = massa * velocidade_x
-        momento_y = massa * velocidade_y
+        self.momento = massa * velocidade
+    
+    def __repr__(self) -> str:
+        return "Particula({}, {}, {}, {})".format(self.velocidade_x, self.velocidade_y, self.raio, self.massa)
+    
+    def __str__(self) -> str:
+        return "Partícula de massa {}, com velocidade {} e ângulo {}".format(self.massa, self.velocidade, self.angulo_velocidade)
 
+p1 = Particula(1,2,5,10)
