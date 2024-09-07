@@ -12,7 +12,7 @@ class Particula:
         self.momento = massa * velocidade
     
     def __repr__(self) -> str:
-        return "Particula({}, {}, {}, {})".format(self.velocidade_x, self.velocidade_y, self.raio, self.massa)
+        return "Particula({}, {}, {}, {})".format(self.velocidade, self.angulo_velocidade, self.raio, self.massa)
     
     def __str__(self) -> str:
         return "Partícula de massa {}, com velocidade {} e ângulo {}".format(self.massa, self.velocidade, self.angulo_velocidade)
