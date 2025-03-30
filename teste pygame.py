@@ -33,14 +33,14 @@ fator_de_escala = fig_width_pontos / tamanho_parede
 areas = np.pi * (raios * fator_de_escala)**2
 
 
+# transforma de figura do matplotlib pra superficie do pygame
 def transformar_em_superficie(figura):
     """Converte de figura do matplotlib pra uma superficie do pygame"""
     canvas = FigureCanvasAgg(figura)
-    buffer = io.BytesIO()
-    canvas.print_raw(buffer)
-    buffer.seek(0)
+    canvas.draw()  # Renderiza a figura
+    buffer = canvas.buffer_rgba()  # Pega o buffer RGBA
     size = canvas.get_width_height()
-    return pygame.image.fromstring(buffer.getvalue(), size, "RGBA")
+    return pygame.image.frombuffer(buffer, size, "RGBA")
 
 def atualiza_plot():
     """Atualiza o plot das particulas"""

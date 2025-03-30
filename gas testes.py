@@ -678,85 +678,7 @@ energias_cineticas = [particula.energia_cinetica for particula in particulas_sim
 momento_colisoes_parede = 0
 energia_cinetica_media = 0
 
-# Inicializar
-pygame.init()
-
-# Dimensoes da tela
-WIDTH, HEIGHT = 1200, 600
-tela = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Simulação de gás")
-
-# Cores referencia pra usar
-branco = (255, 255, 255)
-preto = (0, 0, 0)
-
-# Relogio pra framerate
-clock = pygame.time.Clock()
-FPS = 30
-
-# figuras matplotlib
-fig1, ax1 = plt.subplots(figsize=(8, 8), dpi=100)  # particulas
-fig2, ax2 = plt.subplots(figsize=(6, 4), dpi=100)  # Histograma
-
-# Get figure dimensions in display units
-fig1_comprimento_polegadas = fig1.get_figwidth()
-
-# Convert figure size to points (1 inch = 72 points)
-fig1_comprimento_pontos = fig1_comprimento_polegadas * 72
-fator_de_escala = fig1_comprimento_pontos / tamanho_parede
-areas = np.pi * (raio * fator_de_escala)**2
-
-# transforma de figura do matplotlib pra superficie do pygame
-def transformar_em_superficie(figura):
-    """Converte de figura do matplotlib pra uma superficie do pygame"""
-    canvas = FigureCanvasAgg(figura)
-    buffer = io.BytesIO()
-    canvas.print_raw(buffer)
-    buffer.seek(0)
-    size = canvas.get_width_height()
-    return pygame.image.fromstring(buffer.getvalue(), size, "RGBA")
-
-def atualiza_plot(vetores_posicoes: list[npt.NDArray[np.float64]]):
-    """Atualiza o plot das particulas"""
-    ax1.clear()
-    ax1.set_xlim(0, tamanho_parede)
-    ax1.set_ylim(0, tamanho_parede)
-    ax1.set_aspect('equal')
-    ax1.set_title("Visualização das partículas")
-    
-    ax1.scatter(
-        vetores_posicoes[:, 0],
-        vetores_posicoes[:, 1],
-        s=(raio * fator_de_escala)**2,
-        c='blue',
-        alpha=0.5,
-        edgecolors='red',
-        linewidths=0.5
-    )
-
-def atualiza_histograma(energias_cineticas: list[np.float64]):
-    """Atualiza o histograma dos valores de energia cinética"""
-    ax2.clear()
-    ax2.set_title("Distribuição de energia cinética")
-    ax2.set_xlabel("Energia cinética")
-    ax2.set_ylabel("Contagem")
-    
-    ax2.hist(
-        energias_cineticas, 
-        bins=30,
-        color='skyblue',
-        edgecolor='black',
-        alpha=0.8
-    )
-
-running = True
-while running:
-    for evento_usuario in pygame.event.get():
-        # fecha a janela quando sai do loop
-        if evento_usuario.type == pygame.QUIT:
-            pygame.quit()
-            exit()
-
+def simular_proxima_colisao() -> None:
     # coleta o tempo para o proximo evento
     evento_atual = lista_prioridade[0]
     tempo_para_colisao: np.float64 = evento_atual[0]
@@ -805,30 +727,108 @@ while running:
     # adiciona o tempo avancado no tempo global
     tempo_global += tempo_para_colisao
 
-    # atualiza os plots
-    posicoes = [particula.vetor_posicao for particula in particulas_simulacao]
+# Inicializar pygame
+pygame.init()
+
+# Dimensoes da tela
+WIDTH, HEIGHT = 1200, 600
+tela = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Simulação de gás")
+
+# Cores referencia pra usar
+branco = (255, 255, 255)
+preto = (0, 0, 0)
+
+# Relogio pra framerate
+clock = pygame.time.Clock()
+FPS = 30
+
+# figuras matplotlib
+fig1, ax1 = plt.subplots(figsize=(8, 8), dpi=100)  # particulas
+fig2, ax2 = plt.subplots(figsize=(6, 4), dpi=100)  # Histograma
+
+# Get figure dimensions in display units
+fig1_comprimento_polegadas = fig1.get_figwidth()
+
+# Convert figure size to points (1 inch = 72 points)
+fig1_comprimento_pontos = fig1_comprimento_polegadas * 72
+fator_de_escala = fig1_comprimento_pontos / tamanho_parede
+areas = np.pi * (raio * fator_de_escala)**2
+
+# transforma de figura do matplotlib pra superficie do pygame
+def transformar_em_superficie(figura):
+    """Converte de figura do matplotlib pra uma superficie do pygame"""
+    canvas = FigureCanvasAgg(figura)
+    canvas.draw()  # Renderiza a figura
+    buffer = canvas.buffer_rgba()  # Pega o buffer RGBA
+    size = canvas.get_width_height()
+    return pygame.image.frombuffer(buffer, size, "RGBA")
+
+def atualiza_plot(vetores_posicoes: list[npt.NDArray[np.float64]]):
+    """Atualiza o plot das particulas"""
+    ax1.clear()
+    ax1.set_xlim(0, tamanho_parede)
+    ax1.set_ylim(0, tamanho_parede)
+    ax1.set_aspect('equal')
+    ax1.set_title("Visualização das partículas")
+    
+    ax1.scatter(
+        vetores_posicoes[:, 0],
+        vetores_posicoes[:, 1],
+        s=(raio * fator_de_escala)**2,
+        c='blue',
+        alpha=0.5,
+        edgecolors='red',
+        linewidths=0.5
+    )
+
+def atualiza_histograma(energias_cineticas: list[np.float64]):
+    """Atualiza o histograma dos valores de energia cinética"""
+    ax2.clear()
+    ax2.set_title("Distribuição de energia cinética")
+    ax2.set_xlabel("Energia cinética")
+    ax2.set_ylabel("Contagem")
+    
+    ax2.hist(
+        energias_cineticas, 
+        bins=30,
+        color='skyblue',
+        edgecolor='black',
+        alpha=0.8
+    )
+
+running = True
+while running:
+    # Tratamento de eventos
+    for evento_usuario in pygame.event.get():
+        if evento_usuario.type == pygame.QUIT:
+            running = False
+
+    # Simulacao
+    simular_proxima_colisao()
+
+    # Atualização de dados
+    posicoes = np.array([particula.vetor_posicao for particula in particulas_simulacao])
     energias_cineticas = [particula.energia_cinetica for particula in particulas_simulacao]
+
+    # atualiza os plots
     atualiza_plot(posicoes)
     atualiza_histograma(energias_cineticas)
 
     # transforma em superficies
-    surperficie_particulas = transformar_em_superficie(fig1)
-    superficie_histograma  = transformar_em_superficie(fig2)
+    superficie_particulas = transformar_em_superficie(fig1)
+    superficie_histograma = transformar_em_superficie(fig2)
 
-    # Limpa a tela
+    # renderizacao
     tela.fill(branco)
-
-    # coloca as duas superficies na tela
-    tela.blit(surperficie_particulas, (50, 50))
+    tela.blit(superficie_particulas, (50, 50))
     tela.blit(superficie_histograma, (50, HEIGHT//2 + 50))
 
     pygame.display.flip()
     clock.tick(FPS)
-        
-    energia_cinetica_media = np.mean(energias_cineticas)
-    pressao_parede = momento_colisoes_parede / tempo_sample
-
-    tempo_sample += tempo_global
+    
+    # energia_cinetica_media = np.mean(energias_cineticas)
+    # pressao_parede = momento_colisoes_parede / tempo_sample
 
 pygame.quit()
 plt.close('all')
