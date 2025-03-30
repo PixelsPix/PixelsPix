@@ -3,18 +3,16 @@ import numpy as np
 import numpy.typing as npt
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_agg import FigureCanvasAgg
-import io
 
 # a parede é um cubo/quadrado determinado pelo tamanho do lado do cubo/quadrado e numero de dimensoes
-tamanho_parede: float      = 100 #nm
+tamanho_parede: float      = 70 #nm
 numero_dimensoes: int      = 2
-quantidade_particulas: int = 300
+quantidade_particulas: int = 100
 
 raio:  float = 1 #0.250 #nm
 massa: float = 1 #* 1.66053966e-15 #pg (picogramas)
 
 velocidade_maxima: float = 100 #nm/ns
-iteracaoMaxima: int      = 100
 
 tempo_minimo_para_evento = 1e-12 # so pra ignorar eventos repetidos, caso aparecam
 
@@ -161,8 +159,8 @@ def vetor_normal_colisao(particula_1: Particula, particula_2: Particula) -> npt.
 def velocidades_apos_colisao(massas: list[float], velocidades_normais: list[np.float64]) -> list[np.float64]:
     """
     No momento da colisão, podemos decompor as velocidades das partículas em suas componentes normal ao impacto (v1 e v2) e tangencial. Somente a velocidade normal é alterada.\n
-    v1_nova = ( (m1 - m2) v1 -   2 m2    v2 ) / (m1 + m2)\n
-    v2_nova = (   2 m1    v1 - (m1 - m2) v2 ) / (m1 + m2)
+    v1_nova = ( (m1 - m2) v1 +   2 m2    v2 ) / (m1 + m2)\n
+    v2_nova = (   2 m1    v1 + (m1 - m2) v2 ) / (m1 + m2)
 
     Returns
     -------
@@ -175,8 +173,8 @@ def velocidades_apos_colisao(massas: list[float], velocidades_normais: list[np.f
     diff_massa = m1 - m2
     soma_massa = m1 + m2
 
-    velocidade_1_nova = (diff_massa * v1 -    2*m2    * v2) / soma_massa
-    velocidade_2_nova = (   2*m1    * v1 - diff_massa * v2) / soma_massa
+    velocidade_1_nova = (diff_massa * v1 +    2*m2    * v2) / soma_massa
+    velocidade_2_nova = (   2*m1    * v1 + diff_massa * v2) / soma_massa
 
     return [velocidade_1_nova, velocidade_2_nova]
 
@@ -190,8 +188,8 @@ def colisao(particula_1: Particula, particula_2: Particula) -> None: # O(1)
 
     velocidade_antes  = velocidade_tangencial + velocidade_normal\n
     velocidade_depois = velocidade_tangencial + velocidade_normal_nova
-    """
-    vetor_normal = vetor_normal_colisao(particula_1, particula_2)
+    """ 
+    vetor_normal = (particula_2.vetor_posicao - particula_1.vetor_posicao) / np.linalg.norm(particula_2.vetor_posicao - particula_1.vetor_posicao)
 
     massa_1 = particula_1.massa
     massa_2 = particula_2.massa 
@@ -199,16 +197,14 @@ def colisao(particula_1: Particula, particula_2: Particula) -> None: # O(1)
     v1_normal = np.vdot(particula_1.vetor_velocidade, vetor_normal)
     v2_normal = np.vdot(particula_2.vetor_velocidade, vetor_normal)
 
-    vetor_v1_tangente = particula_1.vetor_velocidade - v1_normal * vetor_normal
-    vetor_v2_tangente = particula_2.vetor_velocidade - v2_normal * vetor_normal
-
     v1_normal_novo, v2_normal_novo = velocidades_apos_colisao(massas = [massa_1, massa_2], velocidades_normais = [v1_normal, v2_normal])
-    
-    velocidade_particula_1 = vetor_v1_tangente + v1_normal_novo * vetor_normal
-    velocidade_particula_2 = vetor_v2_tangente + v2_normal_novo * vetor_normal
-    
-    particula_1 = Particula(particula_1.raio, particula_1.massa, particula_1.vetor_posicao, velocidade_particula_1)
-    particula_2 = Particula(particula_2.raio, particula_2.massa, particula_2.vetor_posicao, velocidade_particula_2)
+
+    # Atualização das velocidades
+    particula_1.vetor_velocidade += (v1_normal_novo - v1_normal) * vetor_normal
+    particula_2.vetor_velocidade += (v2_normal_novo - v2_normal) * vetor_normal
+
+    # particula_1 = Particula(particula_1.raio, particula_1.massa, particula_1.vetor_posicao, velocidade_particula_1)
+    # particula_2 = Particula(particula_2.raio, particula_2.massa, particula_2.vetor_posicao, velocidade_particula_2)
 
 # calculo da previsao de colisao entre duas particulas
 def tempo_colisao_particulas(particula_1: Particula, particula_2: Particula) -> np.float64: # O(1)
@@ -678,60 +674,12 @@ energias_cineticas = [particula.energia_cinetica for particula in particulas_sim
 momento_colisoes_parede = 0
 energia_cinetica_media = 0
 
-def simular_proxima_colisao() -> None:
-    # coleta o tempo para o proximo evento
-    evento_atual = lista_prioridade[0]
-    tempo_para_colisao: np.float64 = evento_atual[0]
-
-    # ignora tempos negativos e muito pequenos
-    while tempo_para_colisao <= tempo_minimo_para_evento:
-        lista_prioridade = lista_prioridade[1:]
-        evento_atual     = lista_prioridade[0]
-        tempo_para_colisao: np.float64 = evento_atual[0]
-        
-    # atualiza a posicao de todas as particulas
-    for particula in particulas_simulacao:
-        particula.atualizar_posicao(tempo_para_colisao)
-
-    # e coleta o par para colisao
-    par_colisao: list[int] = evento_atual[1]
-
-    # se for uma colisao com a parede, usa a funcao de reflexao
-    eh_colisao_parede = par_colisao[1] < 0
-        
-    if eh_colisao_parede:
-        indice_particula, indice_parede = par_colisao
-
-        particula = particulas_simulacao[indice_particula]
-
-        # a parede absorve 2x o momento original da particula naquela dimensao e reflete
-        momento_colisoes_parede += 2 * particula.momento[- 1 - indice_parede]
-        particula.reflexao(indice_parede)
-                
-    # senao pega a particula 2 e colide as duas
-    else:
-        indice_particula_1, indice_particula_2 = par_colisao
-
-        particula_1 = particulas_simulacao[indice_particula_1]
-        particula_2 = particulas_simulacao[indice_particula_2]
-        colisao(particula_1, particula_2)
-
-    # recalcula as colisoes e remove o evento concluido da lista
-    colisoes_recalculadas = recalcular_colisoes(particulas_simulacao, par_colisao)
-    lista_prioridade = remover_evento_fila(lista_prioridade, tempo_para_colisao)
-
-    # adiciona as colisoes recalculadas na lista
-    lista_prioridade = lista_prioridade + colisoes_recalculadas
-    lista_prioridade.sort(key = lambda evento: evento[0])
-        
-    # adiciona o tempo avancado no tempo global
-    tempo_global += tempo_para_colisao
 
 # Inicializar pygame
 pygame.init()
 
 # Dimensoes da tela
-WIDTH, HEIGHT = 1200, 600
+WIDTH, HEIGHT = 1250, 750
 tela = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Simulação de gás")
 
@@ -741,10 +689,10 @@ preto = (0, 0, 0)
 
 # Relogio pra framerate
 clock = pygame.time.Clock()
-FPS = 30
+FPS = 120
 
 # figuras matplotlib
-fig1, ax1 = plt.subplots(figsize=(8, 8), dpi=100)  # particulas
+fig1, ax1 = plt.subplots(figsize=(6, 6), dpi=100)  # particulas
 fig2, ax2 = plt.subplots(figsize=(6, 4), dpi=100)  # Histograma
 
 # Get figure dimensions in display units
@@ -754,6 +702,8 @@ fig1_comprimento_polegadas = fig1.get_figwidth()
 fig1_comprimento_pontos = fig1_comprimento_polegadas * 72
 fator_de_escala = fig1_comprimento_pontos / tamanho_parede
 areas = np.pi * (raio * fator_de_escala)**2
+
+quantidade_bins = 20
 
 # transforma de figura do matplotlib pra superficie do pygame
 def transformar_em_superficie(figura):
@@ -777,7 +727,7 @@ def atualiza_plot(vetores_posicoes: list[npt.NDArray[np.float64]]):
         vetores_posicoes[:, 1],
         s=(raio * fator_de_escala)**2,
         c='blue',
-        alpha=0.5,
+        alpha=0.9,
         edgecolors='red',
         linewidths=0.5
     )
@@ -785,27 +735,92 @@ def atualiza_plot(vetores_posicoes: list[npt.NDArray[np.float64]]):
 def atualiza_histograma(energias_cineticas: list[np.float64]):
     """Atualiza o histograma dos valores de energia cinética"""
     ax2.clear()
+    
+    # Converta para lista simples se necessário
+    energias = energias_cineticas #[float(e) for e in energias_cineticas]
+
+    ax2.hist(
+        energias,
+        bins=quantidade_bins,
+        color='blue',
+        edgecolor='black',
+        alpha=0.8,
+        range=(0, max(energias)*1.1)  # Ajuste automático do range
+    )
+
+    # Atualiza todos os elementos do gráfico
     ax2.set_title("Distribuição de energia cinética")
     ax2.set_xlabel("Energia cinética")
     ax2.set_ylabel("Contagem")
+    ax2.set_xlim(0, 2.8 * velocidade_maxima**2)
+    ax2.set_ylim(0, 0.4 * quantidade_particulas)
+    ax2.autoscale_view()  # Ajusta a escala
     
-    ax2.hist(
-        energias_cineticas, 
-        bins=30,
-        color='skyblue',
-        edgecolor='black',
-        alpha=0.8
-    )
+    # Adicione linha vertical para a média
+    media = np.mean(energias)
+    ax2.axvline(media, color='red', linestyle='dashed', linewidth=1)
+    ax2.text(media*1.05, ax2.get_ylim()[1]*0.9, f'Média: {media:.2f}', color='red')
+
+    fig2.tight_layout()  # Melhora a disposição
+    fig2.canvas.draw()  # Força a renderização
 
 running = True
 while running:
-    # Tratamento de eventos
-    for evento_usuario in pygame.event.get():
-        if evento_usuario.type == pygame.QUIT:
-            running = False
-
     # Simulacao
-    simular_proxima_colisao()
+    for iteracao in range(30):
+        # Tratamento de eventos
+        for evento_usuario in pygame.event.get():
+            if evento_usuario.type == pygame.QUIT:
+                running = False
+            
+        # coleta o tempo para o proximo evento
+        evento_atual = lista_prioridade[0]
+        tempo_para_colisao: np.float64 = evento_atual[0]
+
+        # ignora tempos negativos e muito pequenos
+        while tempo_para_colisao <= tempo_minimo_para_evento:
+            lista_prioridade = lista_prioridade[1:]
+            evento_atual     = lista_prioridade[0]
+            tempo_para_colisao: np.float64 = evento_atual[0]
+            
+        # atualiza a posicao de todas as particulas
+        for particula in particulas_simulacao:
+            particula.atualizar_posicao(tempo_para_colisao)
+
+        # e coleta o par para colisao
+        par_colisao: list[int] = evento_atual[1]
+
+        # se for uma colisao com a parede, usa a funcao de reflexao
+        eh_colisao_parede = par_colisao[1] < 0
+            
+        if eh_colisao_parede:
+            indice_particula, indice_parede = par_colisao
+
+            particula = particulas_simulacao[indice_particula]
+
+            # a parede absorve 2x o momento original da particula naquela dimensao e reflete
+            momento_colisoes_parede += 2 * particula.momento[- 1 - indice_parede]
+            particula.reflexao(indice_parede)
+                    
+        # senao pega a particula 2 e colide as duas
+        else:
+            indice_particula_1, indice_particula_2 = par_colisao
+
+            particula_1 = particulas_simulacao[indice_particula_1]
+            particula_2 = particulas_simulacao[indice_particula_2]
+
+            colisao(particula_1, particula_2)
+
+        # recalcula as colisoes e remove o evento concluido da lista
+        colisoes_recalculadas = recalcular_colisoes(particulas_simulacao, par_colisao)
+        lista_prioridade = remover_evento_fila(lista_prioridade, tempo_para_colisao)
+
+        # adiciona as colisoes recalculadas na lista
+        lista_prioridade = lista_prioridade + colisoes_recalculadas
+        lista_prioridade.sort(key = lambda evento: evento[0])
+            
+        # adiciona o tempo avancado no tempo global
+        # tempo_global += tempo_para_colisao
 
     # Atualização de dados
     posicoes = np.array([particula.vetor_posicao for particula in particulas_simulacao])
@@ -822,9 +837,9 @@ while running:
     # renderizacao
     tela.fill(branco)
     tela.blit(superficie_particulas, (50, 50))
-    tela.blit(superficie_histograma, (50, HEIGHT//2 + 50))
+    tela.blit(superficie_histograma, (600, 150))
 
-    pygame.display.flip()
+    pygame.display.update()
     clock.tick(FPS)
     
     # energia_cinetica_media = np.mean(energias_cineticas)
