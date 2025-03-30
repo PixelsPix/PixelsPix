@@ -772,7 +772,7 @@ while running:
         particula.atualizar_posicao(tempo_para_colisao)
 
     # e coleta o par para colisao
-    ar_colisao: list[int] = evento_atual[1]
+    par_colisao: list[int] = evento_atual[1]
 
     # se for uma colisao com a parede, usa a funcao de reflexao
     eh_colisao_parede = par_colisao[1] < 0
