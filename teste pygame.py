@@ -32,9 +32,6 @@ fig_width_pontos = fig1_comprimento_polegadas * 72
 fator_de_escala = fig_width_pontos / tamanho_parede
 areas = np.pi * (raios * fator_de_escala)**2
 
-x_data = np.random.normal(size=100)
-y_data = np.random.normal(size=100)
-values = np.random.randn(1000)  # For histogram
 
 def transformar_em_superficie(figura):
     """Converte de figura do matplotlib pra uma superficie do pygame"""
@@ -46,12 +43,9 @@ def transformar_em_superficie(figura):
     return pygame.image.fromstring(buffer.getvalue(), size, "RGBA")
 
 def atualiza_plot():
-    """Update the plot data"""
+    """Atualiza o plot das particulas"""
     # Clear and configure axes
     ax1.clear()
-    ax2.clear()
-    
-    # --- Scatter Plot ---
     ax1.set_xlim(0, tamanho_parede)
     ax1.set_ylim(0, tamanho_parede)
     ax1.set_aspect('equal')
@@ -68,7 +62,9 @@ def atualiza_plot():
         linewidths=0.5
     )
     
-    # --- Histogram Plot ---
+def atualiza_histograma():
+    """Atualiza o histograma dos valores de energia cinética"""
+    ax2.clear()
     ax2.set_title("Distribuição de energia cinética")
     ax2.set_xlabel("Energia cinética")
     ax2.set_ylabel("Contagem")
@@ -82,8 +78,8 @@ def atualiza_plot():
         alpha=0.8
     )
 
-running = True
 
+running = True
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -91,11 +87,19 @@ while running:
     
     # Update plot (add your particle position updates here if needed)
     atualiza_plot()
+    atualiza_histograma()
     
     # Render and display
-    surf = transformar_em_superficie(fig)
+    surperficie_particulas = transformar_em_superficie(fig1)
+    superficie_histograma  = transformar_em_superficie(fig2)
+
+    # Limpa a tela
     tela.fill(branco)
-    tela.blit(surf, (WIDTH//2 - surf.get_width()//2, HEIGHT//2 - surf.get_height()//2))
+
+    # Blit both surfaces side by side
+    tela.blit(surperficie_particulas, (50, 50))
+    tela.blit(superficie_histograma, (50, HEIGHT//2 + 50))
+
     pygame.display.flip()
     clock.tick(FPS)
 

@@ -1,23 +1,28 @@
-import pandas as pd
+import pygame
 import numpy as np
 import numpy.typing as npt
 import matplotlib.pyplot as plt
-import statistics
+from matplotlib.backends.backend_agg import FigureCanvasAgg
+import io
 
-# inputs
-numero_muito_grande = np.float64(0b111_111_111_111_111) # um valor muito grande para retornar como tempo de colisao, se não for possível colisões
 # a parede é um cubo/quadrado determinado pelo tamanho do lado do cubo/quadrado e numero de dimensoes
-tamanho_parede: float      = 5 #nm
+tamanho_parede: float      = 100 #nm
 numero_dimensoes: int      = 2
-quantidade_particulas: int = 1
+quantidade_particulas: int = 300
 
-raio:  float = 0.250 #nm
-massa: float = 2 * 1.66053966e-15 #pg (picogramas)
+raio:  float = 1 #0.250 #nm
+massa: float = 1 #* 1.66053966e-15 #pg (picogramas)
 
-velocidade_maxima: float = 10 #nm/ns
+velocidade_maxima: float = 100 #nm/ns
 iteracaoMaxima: int      = 100
 
-# classe das particulas
+tempo_minimo_para_evento = 1e-12 # so pra ignorar eventos repetidos, caso aparecam
+
+tempo_global = 0 #ns
+tempo_sample = 0.02 #ns
+
+numero_muito_grande = np.float64(999999999) # um valor muito grande para retornar se não for possível colisões
+# classe particula
 class Particula:
     def __init__(self, raio: float, massa: float, vetor_posicao: list[float], vetor_velocidade: list[float]) -> None:
         self.massa = float(np.float64(massa))
@@ -60,7 +65,6 @@ class Particula:
     
 # o RNG é um gerador aleatorio de float64 entre [0, 1)
 rng = np.random.default_rng()
-
 def vetor_aleatorio(valor_minimo: float, valor_maximo: float, dimensoes: int) -> npt.NDArray[np.float64]:
     """
     Gera um vetor (ndarray[float64]) com as dimensões dadas, com valores entre valor_minimo e valor_maximo, não inclusivo. Isso é para não ter problemas como iniciar na posição 0 (em colisão com parede)
@@ -79,14 +83,11 @@ def vetor_aleatorio(valor_minimo: float, valor_maximo: float, dimensoes: int) ->
 
     return vetor_aleatorio
 
-# calcula o momento totsl de uma lista de particulas
+# calculador do momento total de uma lista
 def momento_total_lista(lista_de_particulas: list[Particula]) -> npt.NDArray[np.float64]:
     """Soma os vetores de momento de todas as partículas em uma lista"""
-    momento_total = np.zeros(numero_dimensoes)
-    
-    for particula in lista_de_particulas:
-        momento_total += particula.momento
-        
+    lista_momentos = [particula.momento for particula in lista_de_particulas]
+    momento_total = np.sum(lista_momentos, axis=0)
     return momento_total
 
 # criador de particula com posicao e velocidade aleatorias
@@ -107,24 +108,31 @@ def criar_particula_aleatoria(raio: float, massa: float) -> Particula:
     particula_criada = Particula(raio, massa, posicao_criada, velocidade_criada)
     return particula_criada
 
-
 # criador da lista de partículas
 def criar_particulas_iniciais(quantidade_particulas: int, raio: float, massa: float) -> list[Particula]: 
-    """Usa a função criar_particula_aleatoria para criar a uma lista com a quantidade de partículas desejada, ajustando a última para que o momento total da lista seja zero"""
+    """Usa a função criar_particula_aleatoria para criar a uma lista com a quantidade de partículas desejada, ajustando as velocidades de todas pro momento ser zero no final"""
     # primeiro monta uma lista inicial das particulas
     lista_particulas = [criar_particula_aleatoria(raio, massa) for i in range(quantidade_particulas)]
-
-    # depois calculamos o momento total das particulas (exceto a ultima)
-    momento_total = momento_total_lista(lista_particulas[:-1])
     
-    # e calculamos as velocidades da ultima particula para o momento total ser zero 
-    ultima_particula = lista_particulas[-1]
-    velocidade_ultima_particula = - momento_total / ultima_particula.massa
-    ultima_particula.vetor_velocidade = velocidade_ultima_particula
+    lista_velocidades = [particula.vetor_velocidade for particula in lista_particulas]
+    velocidade_para_somar = - np.sum(lista_velocidades, axis=0) / (quantidade_particulas - 1)
+
+    for i in range(quantidade_particulas - 1):
+        particula = lista_particulas[i]
+        nova_velocidade = particula.vetor_velocidade + velocidade_para_somar
+        lista_particulas[i] = Particula(raio, massa, particula.vetor_posicao, nova_velocidade)
+
+    # e a ultima particula recebe o valor que falta para o momento ser zero
+    lista_velocidades = [particula.vetor_velocidade for particula in lista_particulas]
+
+    posicao_ultima_particula = lista_particulas[-1].vetor_posicao
+    velocidade_ultima_particula = lista_particulas[-1].vetor_velocidade - np.sum(lista_velocidades, axis=0)
+
+    lista_particulas[-1] = Particula(raio, massa, posicao_ultima_particula, velocidade_ultima_particula)
 
     return lista_particulas
 
-# calculo do vetor normal a colisao
+# calcula o vetor normal a uma colisao
 def vetor_normal_colisao(particula_1: Particula, particula_2: Particula) -> npt.NDArray[np.float64]:
     """
     Não usar fora da colisão!\n
@@ -149,7 +157,7 @@ def vetor_normal_colisao(particula_1: Particula, particula_2: Particula) -> npt.
 
     return vetor_normal
 
-# recalculo das velocidades das particulas 
+# calcula nova velocidade das particulas depois de colidirem
 def velocidades_apos_colisao(massas: list[float], velocidades_normais: list[np.float64]) -> list[np.float64]:
     """
     No momento da colisão, podemos decompor as velocidades das partículas em suas componentes normal ao impacto (v1 e v2) e tangencial. Somente a velocidade normal é alterada.\n
@@ -172,7 +180,7 @@ def velocidades_apos_colisao(massas: list[float], velocidades_normais: list[np.f
 
     return [velocidade_1_nova, velocidade_2_nova]
 
-# funcao que recalcula as velocidades e atualiza as particulas
+# colide e atualiza as particulas para a colisao
 def colisao(particula_1: Particula, particula_2: Particula) -> None: # O(1)
     """
     Atualiza as velocidades das partículas durante uma colisão. Usar somente se a colisão já for confirmada.\n
@@ -186,7 +194,7 @@ def colisao(particula_1: Particula, particula_2: Particula) -> None: # O(1)
     vetor_normal = vetor_normal_colisao(particula_1, particula_2)
 
     massa_1 = particula_1.massa
-    massa_2 = particula_2.massa
+    massa_2 = particula_2.massa 
 
     v1_normal = np.vdot(particula_1.vetor_velocidade, vetor_normal)
     v2_normal = np.vdot(particula_2.vetor_velocidade, vetor_normal)
@@ -196,10 +204,13 @@ def colisao(particula_1: Particula, particula_2: Particula) -> None: # O(1)
 
     v1_normal_novo, v2_normal_novo = velocidades_apos_colisao(massas = [massa_1, massa_2], velocidades_normais = [v1_normal, v2_normal])
     
-    particula_1.vetor_velocidade = vetor_v1_tangente + v1_normal_novo * vetor_normal
-    particula_2.vetor_velocidade = vetor_v2_tangente + v2_normal_novo * vetor_normal
+    velocidade_particula_1 = vetor_v1_tangente + v1_normal_novo * vetor_normal
+    velocidade_particula_2 = vetor_v2_tangente + v2_normal_novo * vetor_normal
+    
+    particula_1 = Particula(particula_1.raio, particula_1.massa, particula_1.vetor_posicao, velocidade_particula_1)
+    particula_2 = Particula(particula_2.raio, particula_2.massa, particula_2.vetor_posicao, velocidade_particula_2)
 
-# calcula o tempo de colisao entre duas particulas especificas
+# calculo da previsao de colisao entre duas particulas
 def tempo_colisao_particulas(particula_1: Particula, particula_2: Particula) -> np.float64: # O(1)
     """
     Calcula o tempo para duas partículas se colidirem (a velocidades constantes) ou um valor bem grande, para não interferir na lista.\n
@@ -242,8 +253,8 @@ def tempo_colisao_particulas(particula_1: Particula, particula_2: Particula) -> 
     else: # se tiver tudo certo pra colisao, calcula o tempo de colisao normalmente
         tempo_colisao = - (produto_v_r + np.sqrt(discriminante)) / delta_v_quadrado
         return tempo_colisao
-    
-# calcula o tempo para a colisao de uma particula com todas as paredes
+
+# calcuo da previsao de colisoes entre uma particula e todas as paredes
 def tempo_colisao_paredes(particula: Particula) -> npt.NDArray[np.float64]: # O(1)
     """
     Calcula o tempo para que a particula colida com uma parede, já levando em consideração o sentido da velocidade. Se não for possível uma colisão com a parede na dimensão checada, retorna um valor muito grande, para ser ignorado na lista de colisões.\n
@@ -286,7 +297,7 @@ def tempo_colisao_paredes(particula: Particula) -> npt.NDArray[np.float64]: # O(
     
     return tempos_colisoes[::-1]
 
-# dado uma qunatidade de particulas, eh preciso verificar todos os pares de particulas possiveis para colisoes
+# gera todos os pares de colisao entre duas particulas
 def gerar_pares_colisoes(quantidade_particulas: int) -> list[list[int]]: # O(n^2)
     """
     Gera as combinações das possíveis condições de colisão de duas partículas, representadas como números de 0 a quantidade_particulas - 1 na lista.\n
@@ -312,7 +323,7 @@ def gerar_pares_colisoes(quantidade_particulas: int) -> list[list[int]]: # O(n^2
     
     return pares_colisoes
 
-# tambem eh preciso checar os pares de colisao particula-parede
+# gera todos os pares de colisao entre uma particula e as paredes
 def gerar_colisoes_paredes(quantidade_particulas: int, numero_dimensoes: int) -> list[list[int]]: # O(n)
     """
     Gera todos os pares de colisão das partículas com as paredes, retornando uma lista de combinações do índice da partícula (na primeira posção) com o índice da dimensão (na segunda posição).\n
@@ -337,7 +348,7 @@ def gerar_colisoes_paredes(quantidade_particulas: int, numero_dimensoes: int) ->
 
     return colisoes_paredes
 
-# funcao necessaria para encontrar uma particula dentro dos pares de colisoes
+# aencontra as posicoes de uma particula na lista de pares de colisap
 def numero_primeira_posicao(numero_desejado: int, quantidade_particulas: int) -> int:
     """
     Com os pares de colisões sendo uma lista ordenada da forma que seu output ordena naturalmente, o numero_desejado passa a se repetir na primeira posição nos pares a partir de uma posição. Essa função calcula a posição em que essa repetição começa.\n
@@ -385,7 +396,7 @@ def numero_primeira_posicao(numero_desejado: int, quantidade_particulas: int) ->
     posicao_repeticao = int(numero_desejado * (quantidade_particulas - (numero_desejado + 1) / 2))
     return posicao_repeticao
 
-# encontra todos os pares de colisao entre duas particulas com aquela particula especifica
+# encontra todos os indices onde o a particula desejada aparece na lista de pares de colisao entre duas particulas
 def indices_colisao_particulas(numero_desejado: int, quantidade_particulas: int) -> list[int]: # tecnicamente O(n), mas basicamente O(1) para nosso uso
     """
     Calcula todas as posições em que o numero_desejado aparece na lista de colisão entre as partículas, seja na primeira posição da dupla ou na segunda.
@@ -410,7 +421,7 @@ def indices_colisao_particulas(numero_desejado: int, quantidade_particulas: int)
 
     return indices_segundo_lugar + indices_primeiro_lugar
 
-# encontra os todos pares de colisao de uma particula especifica com a parede
+# encontra todos os indices onde o a particula desejada aparece na lista de pares de colisao entre uma particula e as paredes
 def indices_colisao_paredes(numero_desejado: int, quantidade_particulas: int, numero_dimensoes: int) -> list[int]: #O(numero_dimensoes)
     """
     Calcula todas as posições em que o numero_desejado aparece na lista de colisão das partículas com as paredes.\n
@@ -429,14 +440,13 @@ def indices_colisao_paredes(numero_desejado: int, quantidade_particulas: int, nu
     indices_encontrados = [primeiro_indice + n * quantidade_particulas for n in range(numero_dimensoes)]
     return indices_encontrados
 
-# funcoes de checagem de se a colisao eh possivel
+# checagens para tolerancias
 def checar_tempo_colisao(tempo_calculado: np.float64) -> bool:
     """
     Checa se o tempo calculado da colisão é menor que o numero_muito_grande e maior que zero. Essa checagem é para verificar se a colisão é impossível ou se já aconteceu.
     """
     resultado_checagem = tempo_calculado > 0 and tempo_calculado < numero_muito_grande
     return resultado_checagem
-
 def checar_colisao_particulas(particula_1: Particula, particula_2: Particula, tolerancia: float) -> bool:
     """
     Checa se as duas partículas estão a uma distância menor que raio 1 + raio 2 + tolerância.\n
@@ -455,7 +465,6 @@ def checar_colisao_particulas(particula_1: Particula, particula_2: Particula, to
 
     resultado_checagem = distancia_quadrada <= distancia_quadrada_colisao
     return resultado_checagem
-
 def checar_colisao_parede(particula: Particula, indice_parede: int, tolerancia: float) -> bool:
     """
     Checa se a partícula está a uma distância menor que raio + tolerância da parede.\n
@@ -487,7 +496,7 @@ def checar_colisao_parede(particula: Particula, indice_parede: int, tolerancia: 
     resultado_checagem  = abs(posicao_na_dimensao - posicao_parede) < distancia_colisao
     return resultado_checagem
 
-# funcao para montar a lista de prioridade
+# criacao da fila de prioridade
 def criar_fila_prioridade(lista_particulas: list[Particula]) -> list[np.float64 | list[int]]: # O(quantidade_particulas^2)
     """
     Cria a fila de eventos para as colisoes, retornando uma lista de elementos (tempo de colisão e índice das partículas ou paredes na colisão) organizados pelo menor tempo de colisão. Os eventos são organizados no seguinte formato:\n
@@ -535,7 +544,7 @@ def criar_fila_prioridade(lista_particulas: list[Particula]) -> list[np.float64 
 
     return fila_eventos
 
-# funcao para recalcular todos os eventos de colisao de uma particula
+# depois de uma colisao, recalcula os tempos de colisao do par
 def recalcular_colisoes(lista_particulas: list[Particula], par_colisao: list[int]) -> list[np.float64 | list[int]]: # O(quantidade_particulas^2)
     """
     Cria uma fila de eventos para as colisoes de uma particula especifica, retornando uma lista de elementos (tempo de colisão e índice das partículas ou paredes na colisão) organizados pelo menor tempo de colisão. Os eventos são organizados no seguinte formato:\n
@@ -593,7 +602,7 @@ def recalcular_colisoes(lista_particulas: list[Particula], par_colisao: list[int
 
     return lista_eventos
 
-# remove o evento mais proximo de uma lista e atualiza os tempos de todos os outros eventos
+# adicionar e remover eventos da fila
 def remover_evento_fila(fila: list, tempo_avancado: float) -> list[np.float64 | list[int]]:
     """
     Remove o primeiro elemento da fila de prioridades, atualizando também o tempo de todos os próximos eventos. O tempo em cada elemento da lista marca quanto tempo falta para o evento acontecer
@@ -610,8 +619,6 @@ def remover_evento_fila(fila: list, tempo_avancado: float) -> list[np.float64 | 
     fila_atualizada = list(map(atualiza_tempo_evento, fila_atualizada))
 
     return fila_atualizada
-
-# funcao para adicionar eventos na fila
 def adicionar_na_fila(fila: list, tempo_calculado: np.float64, par_indices: list[int]) -> list[np.float64 | list[int]]:
     """
     Essa função edita a lista da fila de prioridade para adicionar a colisão calculada na fila já na ordem certa. Retorna 0 ao concluir.
@@ -661,86 +668,167 @@ def adicionar_na_fila(fila: list, tempo_calculado: np.float64, par_indices: list
     fila_para_atualizar.insert(posicao_insert, [tempo_calculado, par_indices])
     return fila_para_atualizar
 
-# LOOP DE SIMULACAO
-# primeiro cria a lista de particulas e a fila de prioridades
-tempo_global = 0 #ns
-tempo_sample = 0.02 #ns
 
-particulas_simulacao = [criar_particula_aleatoria(1, 1)] #criar_particulas_iniciais(quantidade_particulas, raio, massa)
+# ------ LOOP DE SIMULACAO ------
+particulas_simulacao = criar_particulas_iniciais(quantidade_particulas, raio, massa)
 lista_prioridade = criar_fila_prioridade(particulas_simulacao)
 
-energia_cinetica_total = []
+# declara essas variaveis
+energias_cineticas = [particula.energia_cinetica for particula in particulas_simulacao]
+momento_colisoes_parede = 0
+energia_cinetica_media = 0
 
-lista_velocidades     = []
-lista_momentos_parede = []
-lista_energias_medias = []
+# Inicializar
+pygame.init()
 
-for iteracao in range(iteracaoMaxima):
-    # limpa essas variaveis
-    momento_colisoes_parede = 0
-    energia_cinetica_media = 0
+# Dimensoes da tela
+WIDTH, HEIGHT = 1200, 600
+tela = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Simulação de gás")
+
+# Cores referencia pra usar
+branco = (255, 255, 255)
+preto = (0, 0, 0)
+
+# Relogio pra framerate
+clock = pygame.time.Clock()
+FPS = 30
+
+# figuras matplotlib
+fig1, ax1 = plt.subplots(figsize=(8, 8), dpi=100)  # particulas
+fig2, ax2 = plt.subplots(figsize=(6, 4), dpi=100)  # Histograma
+
+# Get figure dimensions in display units
+fig1_comprimento_polegadas = fig1.get_figwidth()
+
+# Convert figure size to points (1 inch = 72 points)
+fig1_comprimento_pontos = fig1_comprimento_polegadas * 72
+fator_de_escala = fig1_comprimento_pontos / tamanho_parede
+areas = np.pi * (raio * fator_de_escala)**2
+
+# transforma de figura do matplotlib pra superficie do pygame
+def transformar_em_superficie(figura):
+    """Converte de figura do matplotlib pra uma superficie do pygame"""
+    canvas = FigureCanvasAgg(figura)
+    buffer = io.BytesIO()
+    canvas.print_raw(buffer)
+    buffer.seek(0)
+    size = canvas.get_width_height()
+    return pygame.image.fromstring(buffer.getvalue(), size, "RGBA")
+
+def atualiza_plot(vetores_posicoes: list[npt.NDArray[np.float64]]):
+    """Atualiza o plot das particulas"""
+    ax1.clear()
+    ax1.set_xlim(0, tamanho_parede)
+    ax1.set_ylim(0, tamanho_parede)
+    ax1.set_aspect('equal')
+    ax1.set_title("Visualização das partículas")
+    
+    ax1.scatter(
+        vetores_posicoes[:, 0],
+        vetores_posicoes[:, 1],
+        s=(raio * fator_de_escala)**2,
+        c='blue',
+        alpha=0.5,
+        edgecolors='red',
+        linewidths=0.5
+    )
+
+def atualiza_histograma(energias_cineticas: list[np.float64]):
+    """Atualiza o histograma dos valores de energia cinética"""
+    ax2.clear()
+    ax2.set_title("Distribuição de energia cinética")
+    ax2.set_xlabel("Energia cinética")
+    ax2.set_ylabel("Contagem")
+    
+    ax2.hist(
+        energias_cineticas, 
+        bins=30,
+        color='skyblue',
+        edgecolor='black',
+        alpha=0.8
+    )
+
+
+running = True
+while running:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
 
     while (tempo_global < tempo_sample):
         # coleta o tempo para o proximo evento
         evento_atual = lista_prioridade[0]
-        tempo_avancar: np.float64 = evento_atual[0]
+        tempo_para_colisao: np.float64 = evento_atual[0]
 
-        # ignora tempos negativos
-        while tempo_avancar <= 0:
+        # ignora tempos negativos e muito pequenos
+        while tempo_para_colisao <= tempo_minimo_para_evento:
             lista_prioridade = lista_prioridade[1:]
-            evento_atual = lista_prioridade[0]
-            tempo_avancar: np.float64 = evento_atual[0]
+            evento_atual     = lista_prioridade[0]
+            tempo_para_colisao: np.float64 = evento_atual[0]
         
+        # atualiza a posicao de todas as particulas
+        for particula in particulas_simulacao:
+            particula.atualizar_posicao(tempo_para_colisao)
+
         # e coleta o par para colisao
         par_colisao: list[int] = evento_atual[1]
 
-        # atualiza a posicao de todas as particulas
-        for particula in particulas_simulacao:
-            particula.atualizar_posicao(tempo_avancar)
-
-        # coleta a particula 1
-        indice_particula_1 = par_colisao[0]
-        particula_1        = particulas_simulacao[indice_particula_1]
-
         # se for uma colisao com a parede, usa a funcao de reflexao
         eh_colisao_parede = par_colisao[1] < 0
-
+        
         if eh_colisao_parede:
-            indice_parede = par_colisao[1]
+            indice_particula, indice_parede = par_colisao
+
+            particula = particulas_simulacao[indice_particula]
 
             # a parede absorve 2x o momento original da particula naquela dimensao e reflete
-            momento_colisoes_parede += 2 * particula_1.momento[- 1 - indice_parede]
-            particula_1.reflexao(indice_parede)
-
-            # recalcula as colisoes pra particula 1
-            colisoes_recalculadas = recalcular_colisoes(particulas_simulacao, par_colisao)
+            momento_colisoes_parede += 2 * particula.momento[- 1 - indice_parede]
+            particula.reflexao(indice_parede)
                 
         # senao pega a particula 2 e colide as duas
         else:
-            indice_particula_2 = par_colisao[1]
-            particula_2        = particulas_simulacao[indice_particula_2]
+            indice_particula_1, indice_particula_2 = par_colisao
 
+            particula_1 = particulas_simulacao[indice_particula_1]
+            particula_2 = particulas_simulacao[indice_particula_2]
             colisao(particula_1, particula_2)
 
-            # recalcula as colisoes pra particula 1 e particula 2
-            colisoes_recalculadas = recalcular_colisoes(particulas_simulacao, par_colisao)
-
-        # e remove o evento da lista
-        lista_prioridade = remover_evento_fila(lista_prioridade, tempo_avancar)
+        # recalcula as colisoes e remove o evento concluido da lista
+        colisoes_recalculadas = recalcular_colisoes(particulas_simulacao, par_colisao)
+        lista_prioridade = remover_evento_fila(lista_prioridade, tempo_para_colisao)
 
         # adiciona as colisoes recalculadas na lista
         lista_prioridade = lista_prioridade + colisoes_recalculadas
         lista_prioridade.sort(key = lambda evento: evento[0])
         
         # adiciona o tempo avancado no tempo global
-        tempo_global += tempo_avancar
+        tempo_global += tempo_para_colisao
 
-        lista_velocidades = lista_velocidades + [particula.vetor_velocidade for particula in particulas_simulacao]
-        energia_cinetica_total = energia_cinetica_total + [sum([particula.energia_cinetica for particula in particulas_simulacao])]
-        # plotar_particulas(particulas_simulacao)
+        # atualiza os plots
+        posicoes = [particula.vetor_posicao for particula in particulas_simulacao]
+        energias_cineticas = [particula.energia_cinetica for particula in particulas_simulacao]
+        atualiza_plot(posicoes)
+        atualiza_histograma(energias_cineticas)
+
+        # transforma em superficies
+        surperficie_particulas = transformar_em_superficie(fig1)
+        superficie_histograma  = transformar_em_superficie(fig2)
+
+        # Limpa a tela
+        tela.fill(branco)
+
+        # coloca as duas superficies na tela
+        tela.blit(surperficie_particulas, (50, 50))
+        tela.blit(superficie_histograma, (50, HEIGHT//2 + 50))
+
+        pygame.display.flip()
+        clock.tick(FPS)
         
     energia_cinetica_media = np.mean([particula.energia_cinetica for particula in particulas_simulacao])
+    pressao_parede = momento_colisoes_parede / tempo_sample
 
-    tempo_sample = tempo_global + tempo_sample
-    lista_momentos_parede.append(momento_colisoes_parede)
-    lista_energias_medias.append(energia_cinetica_media)
+    tempo_sample += tempo_global
+
+pygame.quit()
+plt.close('all')
