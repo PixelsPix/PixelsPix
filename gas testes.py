@@ -12,9 +12,9 @@ quantidade_particulas: int = 100
 raio:  float = 1 #0.250 #nm
 massa: float = 1 #* 1.66053966e-15 #pg (picogramas)
 
-velocidade_maxima: float = 100 #nm/ns
+velocidade_maxima: float = 10 #nm/ns
 
-tempo_minimo_para_evento = 1e-12 # so pra ignorar eventos repetidos, caso aparecam
+tempo_minimo_para_evento = 0 # so pra ignorar eventos repetidos, caso aparecam
 
 tempo_global = 0 #ns
 tempo_sample = 0.02 #ns
@@ -484,12 +484,12 @@ def checar_colisao_parede(particula: Particula, indice_parede: int, tolerancia: 
         return resultado_checagem
     
     elif(velocidade_na_dimensao < 0): # se estiver indo em direcao da parede negativa (a mais proxima da origem), considerar a parede da origem
-        posicao_parede  = 0
+        posicao_parede = 0
 
     else: # senao considera outra parede naquela dimensao
-        posicao_parede  = tamanho_parede
+        posicao_parede = tamanho_parede
     
-    resultado_checagem  = abs(posicao_na_dimensao - posicao_parede) < distancia_colisao
+    resultado_checagem = abs(posicao_na_dimensao - posicao_parede) <= distancia_colisao
     return resultado_checagem
 
 # criacao da fila de prioridade
@@ -767,13 +767,14 @@ def atualiza_histograma(energias_cineticas: list[np.float64]):
 running = True
 while running:
     # Simulacao
-    for iteracao in range(30):
+    for iteracao in range(10):
         # Tratamento de eventos
         for evento_usuario in pygame.event.get():
             if evento_usuario.type == pygame.QUIT:
                 running = False
             
         # coleta o tempo para o proximo evento
+        colisao_aconteceu = False
         evento_atual = lista_prioridade[0]
         tempo_para_colisao: np.float64 = evento_atual[0]
 
@@ -782,7 +783,7 @@ while running:
             lista_prioridade = lista_prioridade[1:]
             evento_atual     = lista_prioridade[0]
             tempo_para_colisao: np.float64 = evento_atual[0]
-            
+
         # atualiza a posicao de todas as particulas
         for particula in particulas_simulacao:
             particula.atualizar_posicao(tempo_para_colisao)
@@ -792,15 +793,15 @@ while running:
 
         # se for uma colisao com a parede, usa a funcao de reflexao
         eh_colisao_parede = par_colisao[1] < 0
-            
         if eh_colisao_parede:
             indice_particula, indice_parede = par_colisao
-
             particula = particulas_simulacao[indice_particula]
 
-            # a parede absorve 2x o momento original da particula naquela dimensao e reflete
-            momento_colisoes_parede += 2 * particula.momento[- 1 - indice_parede]
-            particula.reflexao(indice_parede)
+            if checar_colisao_parede(particula, indice_parede, 0.3 * particula.raio):
+                # a parede absorve 2x o momento original da particula naquela dimensao e reflete
+                # momento_colisoes_parede += 2 * particula.momento[- 1 - indice_parede]
+                particula.reflexao(indice_parede)
+                colisao_aconteceu = True
                     
         # senao pega a particula 2 e colide as duas
         else:
@@ -808,40 +809,46 @@ while running:
 
             particula_1 = particulas_simulacao[indice_particula_1]
             particula_2 = particulas_simulacao[indice_particula_2]
+            
+            if checar_colisao_particulas(particula_1, particula_2, 1e-9):
+                colisao(particula_1, particula_2)
+                colisao_aconteceu = True
 
-            colisao(particula_1, particula_2)
 
-        # recalcula as colisoes e remove o evento concluido da lista
-        colisoes_recalculadas = recalcular_colisoes(particulas_simulacao, par_colisao)
         lista_prioridade = remover_evento_fila(lista_prioridade, tempo_para_colisao)
 
-        # adiciona as colisoes recalculadas na lista
-        lista_prioridade = lista_prioridade + colisoes_recalculadas
-        lista_prioridade.sort(key = lambda evento: evento[0])
+        # recalcula as colisoes (se tiver acontecido uma)
+        if colisao_aconteceu:
+            colisoes_recalculadas = recalcular_colisoes(particulas_simulacao, par_colisao)
+
+            # adiciona as colisoes recalculadas na lista
+            lista_prioridade = lista_prioridade + colisoes_recalculadas
+            lista_prioridade.sort(key = lambda evento: evento[0])
             
         # adiciona o tempo avancado no tempo global
         # tempo_global += tempo_para_colisao
 
-    # Atualização de dados
-    posicoes = np.array([particula.vetor_posicao for particula in particulas_simulacao])
-    energias_cineticas = [particula.energia_cinetica for particula in particulas_simulacao]
+    if colisao_aconteceu:
+        # Atualização de dados
+        posicoes = np.array([particula.vetor_posicao for particula in particulas_simulacao])
+        energias_cineticas = [particula.energia_cinetica for particula in particulas_simulacao]
 
-    # atualiza os plots
-    atualiza_plot(posicoes)
-    atualiza_histograma(energias_cineticas)
+        # atualiza os plots
+        atualiza_plot(posicoes)
+        atualiza_histograma(energias_cineticas)
 
-    # transforma em superficies
-    superficie_particulas = transformar_em_superficie(fig1)
-    superficie_histograma = transformar_em_superficie(fig2)
+        # transforma em superficies
+        superficie_particulas = transformar_em_superficie(fig1)
+        superficie_histograma = transformar_em_superficie(fig2)
 
-    # renderizacao
-    tela.fill(branco)
-    tela.blit(superficie_particulas, (50, 50))
-    tela.blit(superficie_histograma, (600, 150))
+        # renderizacao
+        tela.fill(branco)
+        tela.blit(superficie_particulas, (50, 50))
+        tela.blit(superficie_histograma, (600, 150))
 
-    pygame.display.update()
-    clock.tick(FPS)
-    
+        pygame.display.update()
+        clock.tick(FPS)
+
     # energia_cinetica_media = np.mean(energias_cineticas)
     # pressao_parede = momento_colisoes_parede / tempo_sample
 
