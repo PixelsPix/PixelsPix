@@ -13,10 +13,10 @@ quantidade_particulas: int = 100
 raio:  float = 5 #0.250 #nm
 massa: float = 1 #* 1.66053966e-15 #pg (picogramas)
 
-velocidade_maxima: float = 100 #nm/ns
+velocidade_maxima: float = 400 #nm/ns
 
 tempo_global = 0 #ns
-tempo_sample = 0.02 #ns
+tempo_sample = 1 #ns
 
 pygame.init()
 
