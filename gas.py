@@ -14,13 +14,14 @@ numero_dimensoes: int       = 2
 capacidade_maxima: int      = 100
 qtd_inicial_particulas: int = 10
 
-raio:  float = 5 #0.250 #nm
+raio:  float = 5 # 0.250 # nm
 massa: float = 1 #* 1.66053966e-15 #pg (picogramas)
 
-velocidade_maxima: float = 400 #nm/ns
+velocidade_maxima: float = 400 # nm/ns
 
-tempo_global = 0 #ns
-tempo_sample = 1 #ns
+tempo_global = 0   # ns
+tempo_frame  = 0.2 # ns
+tempo_sample = 1   # ns
 
 # tela de simulação
 WIDTH, HEIGHT = tamanho_parede, tamanho_parede
@@ -374,7 +375,8 @@ while running:
     
     # atualiza posicoes
     for particula in grid.particulas[grid.particulas_ativas]:
-        particula.atualizar_posicao(0.02)
+        particula.atualizar_posicao(tempo_frame)
+        tempo_global += tempo_frame
     
     # Checar colisoes O(densidade^2)
     for i in range(len(grid.particulas[grid.particulas_ativas])):
@@ -388,6 +390,12 @@ while running:
         particula.desenhar(tela_simulacao, preto)
     
     # Contagem de particulas
+    if tempo_global > tempo_sample:
+        tempo_global = 0
+        energias_cineticas = [particula.energia_cinetica for particula in grid.particulas[grid.particulas_ativas]]
+        energia_cinetica_media = np.mean([particula.energia_cinetica for particula in grid.particulas[grid.particulas_ativas]])
+        momento_colisoes_parede = 0
+
     font = pygame.font.SysFont('Arial', 20)
     contagem_particulas_texto = font.render(f'Particulas: {len(grid.particulas[grid.particulas_ativas])}', True, preto)
     energia_cinetica_media_texto = font.render(f'Energia cinética média: {energia_cinetica_media}', True, preto)
