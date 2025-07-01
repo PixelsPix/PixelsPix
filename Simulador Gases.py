@@ -14,7 +14,7 @@ max_particulas = 350
 raio_particula:  np.float64 = 0.5  # nm
 massa_particula: np.float64 = 1 * 1.66e-27  # kg (massa do hidrogenio)
 
-tempo_entre_frames: np.float64 = 0.0001 # ns
+tempo_entre_frames: np.float64 = 0.0002 # ns
 tempo_coleta_dados: np.float64 = 20 * tempo_entre_frames # ns
 
 temperatura_inicial: np.float64 = 300  # K
@@ -51,9 +51,6 @@ cor_particulas = AZUL_CLARO
 # grid para otimizar colisões
 tamanho_celulas: np.float64 = LARGURA_CAIXA / 5
 
-LARGURA_GRID = int(LARGURA_CAIXA / tamanho_celulas) + 1
-ALTURA_GRID  = int(ALTURA_CAIXA  / tamanho_celulas) + 1
-
 #Particulas sao dicionarios da forma {x, y, vx, vy, massa, raio}
 class SistemaParticulas:
     def __init__(self, quantidade_inicial_particulas: int, temperatura_inicial: int):
@@ -68,8 +65,8 @@ class SistemaParticulas:
     def velocidade_boltzmann(self, temperatura: np.float64):
         """Gera velocidade em m/s a partir da distribuição de Boltzmann"""
         
-        media = np.sqrt(np.pi * kb * temperatura / (2*massa_particula)) # m/s
-        dispersao = np.sqrt(temperatura * kb / massa_particula) # m/s
+        media = np.sqrt(np.pi * kb * temperatura / (2 * massa_particula)) # m/s
+        dispersao = np.sqrt((4 - np.pi) * kb * temperatura / (2 * massa_particula)) # m/s
 
         return random.gauss(media, dispersao)
     
@@ -269,7 +266,7 @@ class SistemaParticulas:
     @property
     def temperatura_medida(self) -> np.float64:
         lista_energias_cineticas = self.energias_cineticas
-        energia_media_medida = np.mean(lista_energias_cineticas[:int(0.9 * self.contagem_particulas)])
+        energia_media_medida = np.mean(lista_energias_cineticas[:int(0.95 * self.contagem_particulas)])
         temperatura = energia_media_medida / kb
         return temperatura
     
@@ -373,13 +370,16 @@ def main():
 
     # estatisticas iniciais
     tempo_ultima_coleta = 0
+    ultima_pressao_medida = sistema_particulas.pressao2d(tempo_coleta_dados)
+    ultima_temperatura_medida = sistema_particulas.temperatura_medida
+
     estatisticas = [
         f"Partículas: {sistema_particulas.contagem_particulas}",
         f"Raio da Partícula: {raio_particula} nm",
         f"Massa da Partícula: {massa_particula:.2e} kg",
         f"Tamanho da Caixa: {LARGURA_CAIXA} nm x {ALTURA_CAIXA} nm",
         f"Temp. Atual: {sistema_particulas.temperatura_atual:.1f} K",
-        f"Pressão: {sistema_particulas.pressao2d(tempo_coleta_dados):.2e} N/m",
+        f"Pressão: {ultima_pressao_medida:.2e} N/m",
         f"Espaço: Pausar/Continuar | Esc: Sair"
     ]
     
@@ -430,12 +430,13 @@ def main():
         screen.blit(fonte_titulo.render("Dados", True, BRANCO), (700, 300))
 
         # desenha caixa de simulacao e particulas
-        pygame.draw.rect(screen, BRANCO, (POS_X_CAIXA_PX, POS_Y_CAIXA_PX, LARGURA_CAIXA_PX, ALTURA_CAIXA_PX), 2)
         for p in sistema_particulas.particulas:
             pixel_central_x = int(POS_X_CAIXA_PX + p['posicao_x'] * PIXELS_POR_NM)
             pixel_central_y = int(POS_Y_CAIXA_PX + p['posicao_y'] * PIXELS_POR_NM)
             raio_em_pixels  = int(p['raio'] * PIXELS_POR_NM)
             pygame.draw.circle(screen, cor_particulas, center=(pixel_central_x, pixel_central_y), radius=raio_em_pixels)
+
+        pygame.draw.rect(screen, BRANCO, (POS_X_CAIXA_PX, POS_Y_CAIXA_PX, LARGURA_CAIXA_PX, ALTURA_CAIXA_PX), 2)
 
         # desenha botoes de controle
         retangulo_botao_adicionar = desenhar_botao(700, 100, 150, 40, "Adicionar 10 Partículas", len(sistema_particulas.particulas) < max_particulas)
@@ -446,15 +447,18 @@ def main():
         # estatisticas
         if tempo_ultima_coleta > tempo_coleta_dados:
             tempo_ultima_coleta = 0
-            estatisticas = [
-                f"Partículas: {sistema_particulas.contagem_particulas}",
-                f"Raio da Partícula: {raio_particula} nm",
-                f"Massa da Partícula: {massa_particula:.2e} kg",
-                f"Tamanho da Caixa: {LARGURA_CAIXA} nm x {ALTURA_CAIXA} nm",
-                f"Temp. Atual: {sistema_particulas.temperatura_medida:.1f} K",
-                f"Pressão: {sistema_particulas.pressao2d(tempo_coleta_dados):.2e} N/m",
-                f"Espaço: Pausar/Continuar | Esc: Sair"
-            ]
+            ultima_pressao_medida = sistema_particulas.pressao2d(tempo_coleta_dados)
+            ultima_temperatura_medida = sistema_particulas.temperatura_medida
+        
+        estatisticas = [
+            f"Partículas: {sistema_particulas.contagem_particulas}",
+            f"Raio da Partícula: {raio_particula} nm",
+            f"Massa da Partícula: {massa_particula:.2e} kg",
+            f"Tamanho da Caixa: {LARGURA_CAIXA} nm x {ALTURA_CAIXA} nm",
+            f"Temp. Atual: {ultima_temperatura_medida:.1f} K",
+            f"Pressão: {ultima_pressao_medida:.2e} N/m",
+            f"Espaço: Pausar/Continuar | Esc: Sair"
+        ]
         
         for i, estatistica in enumerate(estatisticas):
             screen.blit(fonte.render(estatistica, True, BRANCO), (700, 350 + i * 25))
