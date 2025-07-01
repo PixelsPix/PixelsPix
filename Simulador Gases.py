@@ -15,7 +15,7 @@ raio_particula:  np.float64 = 0.5  # nm
 massa_particula: np.float64 = 1 * 1.66e-27  # kg (massa do hidrogenio)
 
 tempo_entre_frames: np.float64 = 0.0002 # ns
-tempo_coleta_dados: np.float64 = 10 * tempo_entre_frames   # ns
+tempo_coleta_dados: np.float64 = 20 * tempo_entre_frames # ns
 
 temperatura_inicial: np.float64 = 300  # K
 temperatura_maxima:  np.float64 = 1300 # K
@@ -27,21 +27,21 @@ quantas_particulas_adicionar: int = 10 # particulas adicionadas/removidas por cl
 
 LARGURA_TELA, ALTURA_TELA = 1200, 900  # tamanho da tela em pixels
 PIXELS_POR_NM = 10  # fator de escala (10 pixels = 1 nm)
-LARGURA_CAIXA: np.float64 = 60  # nm de largura
-ALTURA_CAIXA:  np.float64 = 60  # nm de altura
+LARGURA_CAIXA: np.float64 = 40  # nm de largura
+ALTURA_CAIXA:  np.float64 = 40  # nm de altura
 
 RAIO_PARTICULA_PX = raio_particula * PIXELS_POR_NM
 LARGURA_CAIXA_PX  = LARGURA_CAIXA * PIXELS_POR_NM
 ALTURA_CAIXA_PX   = ALTURA_CAIXA * PIXELS_POR_NM
 
-POS_X_CAIXA_PX, POS_Y_CAIXA_PX = 50, 150  # posicao da caixa na tela em pixels
+POS_X_CAIXA_PX, POS_Y_CAIXA_PX = 350 - int(LARGURA_CAIXA_PX/2), 450 - int(ALTURA_CAIXA_PX/2)  # posicao da caixa na tela em pixels
 
 # Cores
 BRANCO = (255, 255, 255)
 PRETO = (0, 0, 0)
 CINZA = (200, 200, 200)
 VERDE = (0, 255, 0)
-VERDE_ESCURO = (0,200,0)
+VERDE_ESCURO = (0, 200, 0)
 CINZA_ESCURO = (100, 100, 100)
 LARANJA = (255, 165, 0) 
 AZUL_CLARO = (100, 150, 255)
@@ -269,7 +269,7 @@ class SistemaParticulas:
     @property
     def temperatura_medida(self) -> np.float64:
         lista_energias_cineticas = self.energias_cineticas
-        energia_media_medida = np.mean(lista_energias_cineticas[:int(0.8 * self.contagem_particulas)])
+        energia_media_medida = np.mean(lista_energias_cineticas[:int(0.9 * self.contagem_particulas)])
         temperatura = energia_media_medida / kb
         return temperatura
     
