@@ -136,30 +136,33 @@ class SistemaParticulas:
             vy = p['vy']
 
             # funcao horaria
-            p['posicao_x'] += vx * tempo_decorrido
-            p['posicao_y'] += vy * tempo_decorrido
+            x_novo = x + vx * tempo_decorrido
+            y_novo = y + vy * tempo_decorrido
             
             # Colisões com as paredes em x
-            if x - r < 0:
-                p['posicao_x'] = r
+            if x_novo - r < 0:
+                x_novo = r
                 p['vx'] = - vx
                 self.momento_transferido_paredes += 2 * abs(vx * m)
             
-            if x + r > LARGURA_CAIXA:
-                p['posicao_x'] = LARGURA_CAIXA - r
+            if x_novo + r > LARGURA_CAIXA:
+                x_novo = LARGURA_CAIXA - r
                 p['vx'] = - vx
                 self.momento_transferido_paredes += 2 * abs(vx * m)
             
             # Colisões com as paredes em y
-            if y - r < 0:
-                p['posicao_y'] = r
+            if y_novo - r < 0:
+                y_novo = r
                 p['vy'] = - vy
                 self.momento_transferido_paredes += 2 * abs(vy * m)
             
-            if y + r > ALTURA_CAIXA:
-                p['posicao_y'] = ALTURA_CAIXA - r
+            if y_novo + r > ALTURA_CAIXA:
+                y_novo = ALTURA_CAIXA - r
                 p['vy'] = - vy
                 self.momento_transferido_paredes += 2 * abs(vy * m)
+
+            p['posicao_x'] = x_novo
+            p['posicao_y'] = y_novo
 
     def colidir_particulas(self, indice_particula_1: int, indice_particula_2: int):
         """Checa se duas particulas estão em colisão e atualiza elas se necessário."""
