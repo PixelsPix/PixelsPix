@@ -14,11 +14,12 @@ max_particulas = 500
 raio_particula:  np.float64 = 0.5  # nm
 massa_particula: np.float64 = 1 * 1.66e-27  # kg (massa do hidrogenio)
 
-tempo_entre_frames: np.float64 = 0.2 # ns
-tempo_coleta_dados: np.float64 = 1   # ns
+tempo_entre_frames: np.float64 = 0.0002 # ns
+tempo_coleta_dados: np.float64 = 10 * tempo_entre_frames   # ns
 
 temperatura_inicial: np.float64 = 300  # K
 temperatura_maxima:  np.float64 = 1300 # K
+temperatura_minima:  np.float64 = 100  # K
 
 energia_maxima_histograma  = 8e-20 #J
 kb: np.float64 = 1.380649e-23  # J/K
@@ -75,8 +76,8 @@ class SistemaParticulas:
     def inicializar_particulas(self, quantidade_particulas, temperatura):
         """Cria particulas iniciais nas condições iniciais dadas (quantidade e temperatura)"""
         for _ in range(quantidade_particulas):
-            posicao_x = random.uniform(LARGURA_CAIXA + raio_particula, LARGURA_CAIXA - raio_particula)
-            posicao_y = random.uniform(ALTURA_CAIXA  + raio_particula, ALTURA_CAIXA  - raio_particula)
+            posicao_x = random.uniform(raio_particula, LARGURA_CAIXA - raio_particula)
+            posicao_y = random.uniform(raio_particula, ALTURA_CAIXA  - raio_particula)
 
             velocidade = self.velocidade_boltzmann(temperatura)
             angulo = random.uniform(0, 2*np.pi)
@@ -167,36 +168,40 @@ class SistemaParticulas:
         """Checa se duas particulas estão em colisão e atualiza elas se necessário."""
         p1, p2 = self.particulas[indice_particula_1], self.particulas[indice_particula_2]
 
-        x1,  x2  = p1['posicao_x'], p2['posicao_x']
-        y1,  y2  = p1['posicao_y'], p2['posicao_y']
-        m1,  m2  = p1['massa'],     p2['massa']
-        r1,  r2  = p1['raio'],      p2['raio']
-        vx1, vx2 = p1['vx'],        p2['vx']
-        vy1, vy2 = p1['vy'],        p2['vy']
+        x1, x2 = p1['posicao_x'], p2['posicao_x']
+        y1, y2 = p1['posicao_y'], p2['posicao_y']
+        m1, m2 = p1['massa'], p2['massa']
+        r1, r2 = p1['raio'], p2['raio']
+        vx1, vx2 = p1['vx'], p2['vx']
+        vy1, vy2 = p1['vy'], p2['vy']
 
-        distancia_x = x1 - x2
-        distancia_y = y1 - y2
+        dx = x1 - x2
+        dy = y1 - y2
+        distancia = np.sqrt(dx**2 + dy**2)
 
-        distancia = np.sqrt(distancia_x**2 + distancia_y**2)
-        
         if distancia < r1 + r2:
-            # colisao eh possivel
-            normal_x, normal_y = distancia_x/distancia, distancia_y/distancia
+            # vetor normalizado de colisao
+            nx, ny = dx / distancia, dy / distancia
 
-            delta_vx = vx1 - vx2
-            delta_vy = vy1 - vy2
+            # velocidade relativa ao longo da normal
+            v_rel = (vx1 - vx2) * nx + (vy1 - vy2) * ny
 
-            v1_normal = delta_vx * normal_x + delta_vy * normal_y
-            # considera que a particula 2 ta parada
+            if v_rel < 0:  # Aproximando uma da outra
+                # Impulso
+                j = -2 * v_rel / (1/m1 + 1/m2)
 
-            if v1_normal < 0: # indo de encontro uma com a outra (colisao acontece)
-                impulso = 2 * v1_normal / (1/m1 + 1/m2)
+                # Atualiza velocidades
+                p1['vx'] += j * nx / m1
+                p1['vy'] += j * ny / m1
+                p2['vx'] -= j * nx / m2
+                p2['vy'] -= j * ny / m2
 
-                p1['vx'] += impulso * normal_x / m1
-                p1['vy'] += impulso * normal_y / m1
-
-                p2['vx'] += impulso * normal_x / m2
-                p2['vy'] += impulso * normal_y / m2
+                # Corrige sobreposição (opcional)
+                overlap = (r1 + r2) - distancia
+                p1['posicao_x'] += overlap * nx * 0.5
+                p1['posicao_y'] += overlap * ny * 0.5
+                p2['posicao_x'] -= overlap * nx * 0.5
+                p2['posicao_y'] -= overlap * ny * 0.5
     
     def rodar_colisoes(self):
         """Calcula todas as colisões entre as partículas do sistema"""
@@ -271,9 +276,35 @@ class SistemaParticulas:
     def pressao2d(self, tempo_decorrido) -> np.float64:
         area2d_paredes = 2 * (LARGURA_CAIXA + ALTURA_CAIXA) # nm
         forca_aplicada_paredes = self.momento_transferido_paredes / tempo_decorrido # GN
-        pressao2d = forca_aplicada_paredes / area2d_paredes # GN/nm = 10^18 N/m
+        pressao2d = forca_aplicada_paredes / area2d_paredes * 1e18 # N/m
         self.momento_transferido_paredes = 0
         return pressao2d
+    
+    def aquecer(self, delta_temperatura):
+        """Ajusta a temperatura do sistema pelo fator especificado"""
+        if delta_temperatura == 0:
+            return
+        
+        temperatura_atual = self.temperatura_atual
+        temperatura_nova = temperatura_atual + delta_temperatura
+        
+        # Evita temperaturas negativas
+        if temperatura_nova < temperatura_minima:
+            temperatura_nova = temperatura_minima
+        
+        elif temperatura_nova > temperatura_maxima:
+            temperatura_nova = temperatura_maxima
+        
+        # Fator de escala de velocidade
+        if temperatura_atual > 0:
+            fator = np.sqrt(temperatura_nova / temperatura_atual)
+        else:
+            fator = 1
+        
+        # Ajusta todas as velocidades
+        for p in self.particulas:
+            p['vx'] *= fator
+            p['vy'] *= fator
 
 # plotagem do histograma
 plt.ioff()
@@ -345,10 +376,10 @@ def main():
     estatisticas = [
         f"Partículas: {sistema_particulas.contagem_particulas}",
         f"Raio da Partícula: {raio_particula} nm",
-        f"Massa da Partícula: {massa_particula:.1e} kg",
+        f"Massa da Partícula: {massa_particula:.2e} kg",
         f"Tamanho da Caixa: {LARGURA_CAIXA} nm x {ALTURA_CAIXA} nm",
         f"Temp. Atual: {sistema_particulas.temperatura_atual:.1f} K",
-        f"Pressão: {sistema_particulas.pressao2d(tempo_coleta_dados):.2e} 10^18 N/m",
+        f"Pressão: {sistema_particulas.pressao2d(tempo_coleta_dados):.2e} N/m",
         f"Espaço: Pausar/Continuar | Esc: Sair"
     ]
     
@@ -379,11 +410,11 @@ def main():
                 elif retangulo_botao_remover.collidepoint(posicao_mouse):
                     sistema_particulas.remover_particulas(quantas_particulas_adicionar)
 
-                elif retangulo_botao_aquecer.collidepoint(posicao_mouse) and sistema_particulas.temperatura_atual > 1300:
-                    sistema_particulas.temperatura_alvo += 50 # K
+                elif retangulo_botao_aquecer.collidepoint(posicao_mouse) and sistema_particulas.temperatura_atual < temperatura_maxima:
+                    sistema_particulas.aquecer(50)  # Aquecer
 
-                elif retangulo_botao_resfriar.collidepoint(posicao_mouse) and sistema_particulas.temperatura_atual > 50:
-                    sistema_particulas.temperatura_alvo -= 50 # K
+                elif retangulo_botao_resfriar.collidepoint(posicao_mouse) and sistema_particulas.temperatura_atual > temperatura_minima:
+                    sistema_particulas.aquecer(-50)  # Resfriar
     
         if not pausado:
             tempo_ultima_coleta += tempo_entre_frames
@@ -404,14 +435,13 @@ def main():
             pixel_central_x = int(POS_X_CAIXA_PX + p['posicao_x'] * PIXELS_POR_NM)
             pixel_central_y = int(POS_Y_CAIXA_PX + p['posicao_y'] * PIXELS_POR_NM)
             raio_em_pixels  = int(p['raio'] * PIXELS_POR_NM)
-            if 0 <= pixel_central_x <= LARGURA_TELA and 0 <= pixel_central_y <= ALTURA_TELA:
-                pygame.draw.circle(screen, cor_particulas, center=(pixel_central_x, pixel_central_y), radius=raio_em_pixels)
+            pygame.draw.circle(screen, cor_particulas, center=(pixel_central_x, pixel_central_y), radius=raio_em_pixels)
 
         # desenha botoes de controle
         retangulo_botao_adicionar = desenhar_botao(700, 100, 150, 40, "Adicionar 10 Partículas", len(sistema_particulas.particulas) < max_particulas)
         retangulo_botao_remover   = desenhar_botao(700, 150, 150, 40, "Remover 10 Partículas",   len(sistema_particulas.particulas) > min_particulas)
-        retangulo_botao_aquecer   = desenhar_botao(700, 200, 150, 40, "Aquecer (+50K)",  sistema_particulas.temperatura_atual < 1300)
-        retangulo_botao_resfriar  = desenhar_botao(700, 250, 150, 40, "Resfriar (-50K)", sistema_particulas.temperatura_atual > 50)
+        retangulo_botao_aquecer   = desenhar_botao(700, 200, 150, 40, "Aquecer (+50K)",  sistema_particulas.temperatura_atual < temperatura_maxima)
+        retangulo_botao_resfriar  = desenhar_botao(700, 250, 150, 40, "Resfriar (-50K)", sistema_particulas.temperatura_atual > temperatura_minima)
 
         # estatisticas
         if tempo_ultima_coleta > tempo_coleta_dados:
@@ -419,10 +449,10 @@ def main():
             estatisticas = [
                 f"Partículas: {sistema_particulas.contagem_particulas}",
                 f"Raio da Partícula: {raio_particula} nm",
-                f"Massa da Partícula: {massa_particula:.1e} kg",
+                f"Massa da Partícula: {massa_particula:.2e} kg",
                 f"Tamanho da Caixa: {LARGURA_CAIXA} nm x {ALTURA_CAIXA} nm",
-                f"Temp. Atual: {sistema_particulas.temperatura_atual:.1f} K",
-                f"Pressão: {sistema_particulas.pressao2d(tempo_coleta_dados):.2e} 10^18 N/m",
+                f"Temp. Atual: {sistema_particulas.temperatura_medida:.1f} K",
+                f"Pressão: {sistema_particulas.pressao2d(tempo_coleta_dados):.2e} N/m",
                 f"Espaço: Pausar/Continuar | Esc: Sair"
             ]
         
