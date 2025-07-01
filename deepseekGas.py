@@ -294,9 +294,9 @@ def main():
     
     # Retângulos dos botões
     retangulo_botao_adicionar = pygame.Rect(0, 0, 0, 0)
-    retangulo_botao_remover = pygame.Rect(0, 0, 0, 0)
-    retangulo_botao_aquecer = pygame.Rect(0, 0, 0, 0)
-    retangulo_botao_resfriar = pygame.Rect(0, 0, 0, 0)
+    retangulo_botao_remover   = pygame.Rect(0, 0, 0, 0)
+    retangulo_botao_aquecer   = pygame.Rect(0, 0, 0, 0)
+    retangulo_botao_resfriar  = pygame.Rect(0, 0, 0, 0)
     
     while running:
         dt = 0.0005
