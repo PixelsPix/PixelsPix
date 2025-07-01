@@ -27,8 +27,8 @@ quantas_particulas_adicionar: int = 10 # particulas adicionadas/removidas por cl
 
 LARGURA_TELA, ALTURA_TELA = 1200, 900  # tamanho da tela em pixels
 PIXELS_POR_NM = 10  # fator de escala (10 pixels = 1 nm)
-LARGURA_CAIXA: np.float64 = 40 # nm de largura
-ALTURA_CAIXA:  np.float64 = 40 # nm de altura
+LARGURA_CAIXA: np.float64 = 50 # nm de largura
+ALTURA_CAIXA:  np.float64 = 50 # nm de altura
 
 RAIO_PARTICULA_PX = raio_particula * PIXELS_POR_NM
 LARGURA_CAIXA_PX  = LARGURA_CAIXA * PIXELS_POR_NM
