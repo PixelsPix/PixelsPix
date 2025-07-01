@@ -14,7 +14,7 @@ max_particulas = 350
 raio_particula:  np.float64 = 0.5  # nm
 massa_particula: np.float64 = 1 * 1.66e-27  # kg (massa do hidrogenio)
 
-tempo_entre_frames: np.float64 = 0.0002 # ns
+tempo_entre_frames: np.float64 = 0.0001 # ns
 tempo_coleta_dados: np.float64 = 20 * tempo_entre_frames # ns
 
 temperatura_inicial: np.float64 = 300  # K
