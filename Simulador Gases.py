@@ -8,8 +8,8 @@ from collections import defaultdict
 
 # parametros da simulacao
 quantidade_inicial_particulas = 200
-min_particulas = 10
-max_particulas = 500
+min_particulas = 100
+max_particulas = 350
 
 raio_particula:  np.float64 = 0.5  # nm
 massa_particula: np.float64 = 1 * 1.66e-27  # kg (massa do hidrogenio)
