@@ -25,7 +25,8 @@ velocidade_maxima_histograma = 10000 # m/s
 kb: np.float64 = 1.380649e-23  # J/K
 quantas_particulas_adicionar: int = 10 # particulas adicionadas/removidas por clique
 proporcao_considerada_na_temperatura: float = 0.99
-temperatura_aquecimento: float = 20
+temperatura_aquecimento: float = 5
+intervalo_aquecimento: float = 0.01
 
 LARGURA_TELA, ALTURA_TELA = 1200, 900  # tamanho da tela em pixels
 PIXELS_POR_NM = 15  # fator de escala (10 pixels = 1 nm)
@@ -45,7 +46,8 @@ CINZA = (200, 200, 200)
 VERDE = (0, 255, 0)
 VERDE_ESCURO = (0, 200, 0)
 CINZA_ESCURO = (100, 100, 100)
-LARANJA = (255, 165, 0) 
+LARANJA = (255, 50, 0) 
+AZUL = (0, 0, 255)
 AZUL_CLARO = (100, 150, 255)
 
 cor_particulas = AZUL_CLARO
@@ -68,7 +70,7 @@ class SistemaParticulas:
         """Gera velocidade em m/s a partir da distribuição de Boltzmann"""
         sigma = np.sqrt(kb * temperatura / massa_particula)  # m/s
         # Amostra a magnitude usando a distribuicao de Rayleigh
-        velocidade = sigma * np.sqrt(-2 * np.log(random.random()))
+        velocidade = np.random.rayleigh(sigma)
     
         return velocidade #random.gauss(media, dispersao)
     
@@ -371,7 +373,9 @@ def desenhar_botao(x, y, largura, altura, texto, ativo=True, cor=VERDE_ESCURO):
 
 def main():
     running = True
-    pausado = False
+    aquecendo  = False
+    resfriando = False
+    ultimo_tempo_aquecimento = 0
 
     # estatisticas iniciais
     tempo_ultima_coleta = 0
@@ -398,14 +402,7 @@ def main():
             if event.type == pygame.QUIT:
                 running = False
 
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_SPACE:
-                    pausado = not pausado
-
-                elif event.key == pygame.K_ESCAPE:
-                    running = False
-
-            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1: # botao direito
                 posicao_mouse = pygame.mouse.get_pos()
 
                 if retangulo_botao_adicionar.collidepoint(posicao_mouse):
@@ -415,15 +412,30 @@ def main():
                     sistema_particulas.remover_particulas(quantas_particulas_adicionar)
 
                 elif retangulo_botao_aquecer.collidepoint(posicao_mouse) and sistema_particulas.temperatura_atual < temperatura_maxima:
-                    sistema_particulas.aquecer(temperatura_aquecimento)  # Aquecer
+                    aquecendo  = True
+                    resfriando = False
 
                 elif retangulo_botao_resfriar.collidepoint(posicao_mouse) and sistema_particulas.temperatura_atual > temperatura_minima:
-                    sistema_particulas.aquecer(-temperatura_aquecimento)  # Resfriar
-    
-        if not pausado:
-            tempo_ultima_coleta += tempo_entre_frames
-            sistema_particulas.atualizar_sistema(tempo_entre_frames)
-            superficie_histograma = desenhar_histograma(sistema_particulas.contagem_particulas, sistema_particulas.velocidades, sistema_particulas.temperatura_atual)
+                    aquecendo  = False
+                    resfriando = True
+                
+            elif event.type == pygame.MOUSEBUTTONUP:
+                if event.button == 1:  # Botão esquerdo do mouse liberado
+                    aquecendo = False
+                    resfriando = False
+        
+        tempo_atual = pygame.time.get_ticks() / 1000  # Converte para segundos
+        if aquecendo and (tempo_atual - ultimo_tempo_aquecimento > intervalo_aquecimento):
+            sistema_particulas.aquecer(temperatura_aquecimento)
+            ultimo_tempo_aquecimento = tempo_atual
+        
+        if resfriando and (tempo_atual - ultimo_tempo_aquecimento > intervalo_aquecimento):
+            sistema_particulas.aquecer(-temperatura_aquecimento)
+            ultimo_tempo_aquecimento = tempo_atual
+
+        tempo_ultima_coleta += tempo_entre_frames
+        sistema_particulas.atualizar_sistema(tempo_entre_frames)
+        superficie_histograma = desenhar_histograma(sistema_particulas.contagem_particulas, sistema_particulas.velocidades, sistema_particulas.temperatura_atual)
         
         # limpa a tela
         screen.fill(PRETO)
@@ -445,8 +457,8 @@ def main():
         # desenha botoes de controle
         retangulo_botao_adicionar = desenhar_botao(700, 100, 150, 40, f"Adicionar {quantas_particulas_adicionar} Partículas", len(sistema_particulas.particulas) < max_particulas)
         retangulo_botao_remover   = desenhar_botao(700, 150, 150, 40, f"Remover {quantas_particulas_adicionar} Partículas",   len(sistema_particulas.particulas) > min_particulas)
-        retangulo_botao_aquecer   = desenhar_botao(700, 200, 150, 40, f"Aquecer (+{temperatura_aquecimento} °C)",  sistema_particulas.temperatura_atual < temperatura_maxima)
-        retangulo_botao_resfriar  = desenhar_botao(700, 250, 150, 40, f"Resfriar (-{temperatura_aquecimento} °C)", sistema_particulas.temperatura_atual > temperatura_minima)
+        retangulo_botao_aquecer   = desenhar_botao(700, 200, 150, 40, f"Aquecer (+{temperatura_aquecimento} °C)",  sistema_particulas.temperatura_atual < 0.99 * temperatura_maxima, VERDE_ESCURO if not aquecendo  else LARANJA)
+        retangulo_botao_resfriar  = desenhar_botao(700, 250, 150, 40, f"Resfriar (-{temperatura_aquecimento} °C)", sistema_particulas.temperatura_atual > 1.01 * temperatura_minima, VERDE_ESCURO if not resfriando else AZUL)
 
         # estatisticas
         if tempo_ultima_coleta > tempo_coleta_dados:
@@ -460,7 +472,7 @@ def main():
             f"Tamanho da Caixa: {LARGURA_CAIXA} nm x {ALTURA_CAIXA} nm",
             f"Temperatura Atual: {sistema_particulas.temperatura_medida - 273.15:.1f} °C",
             f"Pressão: {ultima_pressao_medida:.2e} N/m",
-            f"Espaço: Pausar/Continuar | Esc: Sair"
+            f"Temperatura Real: {sistema_particulas.temperatura_atual:.1f} K",
         ]
         
         for i, estatistica in enumerate(estatisticas):
