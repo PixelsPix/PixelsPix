@@ -387,8 +387,7 @@ def main():
         f"Massa da Partícula: {massa_particula:.2e} kg",
         f"Tamanho da Caixa: {LARGURA_CAIXA} nm x {ALTURA_CAIXA} nm",
         f"Temperatura Atual: {sistema_particulas.temperatura_atual - 273.15:.1f} °C",
-        f"Pressão: {ultima_pressao_medida:.2e} N/m",
-        f"Espaço: Pausar/Continuar | Esc: Sair"
+        f"Pressão: {ultima_pressao_medida:.2e} N/m"
     ]
     
     # retangulos dos botoes
@@ -471,8 +470,7 @@ def main():
             f"Massa da Partícula: {massa_particula:.2e} kg",
             f"Tamanho da Caixa: {LARGURA_CAIXA} nm x {ALTURA_CAIXA} nm",
             f"Temperatura Atual: {sistema_particulas.temperatura_medida - 273.15:.1f} °C",
-            f"Pressão: {ultima_pressao_medida:.2e} N/m",
-            f"Temperatura Real: {sistema_particulas.temperatura_atual:.1f} K",
+            f"Pressão: {ultima_pressao_medida:.2e} N/m"
         ]
         
         for i, estatistica in enumerate(estatisticas):
