@@ -382,6 +382,7 @@ def main():
     ultima_pressao_medida = sistema_particulas.pressao2d(tempo_coleta_dados)
 
     estatisticas = [
+        f"Tempo entre frames: {tempo_entre_frames * 1000} ps por frame",
         f"Partículas: {sistema_particulas.contagem_particulas}",
         f"Raio da Partícula: {raio_particula} nm",
         f"Massa da Partícula: {massa_particula:.2e} kg",
@@ -465,6 +466,7 @@ def main():
             ultima_pressao_medida = sistema_particulas.pressao2d(tempo_coleta_dados)
         
         estatisticas = [
+            f"Tempo entre frames: {tempo_entre_frames * 1000} ps por frame",
             f"Partículas: {sistema_particulas.contagem_particulas}",
             f"Raio da Partícula: {raio_particula} nm",
             f"Massa da Partícula: {massa_particula:.2e} kg",
