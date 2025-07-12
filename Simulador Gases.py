@@ -24,7 +24,7 @@ temperatura_minima:  np.float64 = 100  # K
 velocidade_maxima_histograma = 10000 # m/s
 kb: np.float64 = 1.380649e-23  # J/K
 quantas_particulas_adicionar: int = 10 # particulas adicionadas/removidas por clique
-proporcao_considerada_na_temperatura: float = 0.99
+proporcao_considerada_na_temperatura: float = 0.995
 temperatura_aquecimento: float = 5
 intervalo_aquecimento: float = 0.01
 
@@ -273,7 +273,7 @@ class SistemaParticulas:
     @property
     def temperatura_medida(self) -> np.float64:
         lista_energias_cineticas = self.energias_cineticas
-        energia_media_medida = np.mean(lista_energias_cineticas[:int(proporcao_considerada_na_temperatura * self.contagem_particulas)])
+        energia_media_medida = np.mean(lista_energias_cineticas[:int(round(proporcao_considerada_na_temperatura * self.contagem_particulas))])
         temperatura = energia_media_medida / kb
         return temperatura
     
@@ -387,7 +387,7 @@ def main():
         f"Raio da Partícula: {raio_particula} nm",
         f"Massa da Partícula: {massa_particula:.2e} kg",
         f"Tamanho da Caixa: {LARGURA_CAIXA} nm x {ALTURA_CAIXA} nm",
-        f"Temperatura Atual: {sistema_particulas.temperatura_atual - 273.15:.1f} °C",
+        f"Temperatura Atual: {sistema_particulas.temperatura_atual:.1f} K",
         f"Pressão: {ultima_pressao_medida:.2e} N/m"
     ]
     
@@ -426,11 +426,11 @@ def main():
         
         tempo_atual = pygame.time.get_ticks() / 1000  # Converte para segundos
         if aquecendo and (tempo_atual - ultimo_tempo_aquecimento > intervalo_aquecimento):
-            sistema_particulas.aquecer(temperatura_aquecimento)
+            sistema_particulas.aquecer(temperatura_aquecimento * np.random.uniform(0.7,1.3))
             ultimo_tempo_aquecimento = tempo_atual
         
         if resfriando and (tempo_atual - ultimo_tempo_aquecimento > intervalo_aquecimento):
-            sistema_particulas.aquecer(-temperatura_aquecimento)
+            sistema_particulas.aquecer(-temperatura_aquecimento * np.random.uniform(0.7,1.3))
             ultimo_tempo_aquecimento = tempo_atual
 
         tempo_ultima_coleta += tempo_entre_frames
@@ -457,8 +457,8 @@ def main():
         # desenha botoes de controle
         retangulo_botao_adicionar = desenhar_botao(700, 100, 150, 40, f"Adicionar {quantas_particulas_adicionar} Partículas", len(sistema_particulas.particulas) < max_particulas)
         retangulo_botao_remover   = desenhar_botao(700, 150, 150, 40, f"Remover {quantas_particulas_adicionar} Partículas",   len(sistema_particulas.particulas) > min_particulas)
-        retangulo_botao_aquecer   = desenhar_botao(700, 200, 150, 40, f"Aquecer (+{temperatura_aquecimento} °C)",  sistema_particulas.temperatura_atual < 0.99 * temperatura_maxima, VERDE_ESCURO if not aquecendo  else LARANJA)
-        retangulo_botao_resfriar  = desenhar_botao(700, 250, 150, 40, f"Resfriar (-{temperatura_aquecimento} °C)", sistema_particulas.temperatura_atual > 1.01 * temperatura_minima, VERDE_ESCURO if not resfriando else AZUL)
+        retangulo_botao_aquecer   = desenhar_botao(700, 200, 150, 40, f"Aquecer",  sistema_particulas.temperatura_atual < 0.99 * temperatura_maxima, VERDE_ESCURO if not aquecendo  else LARANJA)
+        retangulo_botao_resfriar  = desenhar_botao(700, 250, 150, 40, f"Resfriar", sistema_particulas.temperatura_atual > 1.01 * temperatura_minima, VERDE_ESCURO if not resfriando else AZUL)
 
         # estatisticas
         if tempo_ultima_coleta > tempo_coleta_dados:
@@ -471,7 +471,7 @@ def main():
             f"Raio da Partícula: {raio_particula} nm",
             f"Massa da Partícula: {massa_particula:.2e} kg",
             f"Tamanho da Caixa: {LARGURA_CAIXA} nm x {ALTURA_CAIXA} nm",
-            f"Temperatura Atual: {sistema_particulas.temperatura_medida - 273.15:.1f} °C",
+            f"Temperatura Atual: {sistema_particulas.temperatura_atual:.1f} K",
             f"Pressão: {ultima_pressao_medida:.2e} N/m"
         ]
         
