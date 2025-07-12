@@ -15,20 +15,22 @@ raio_particula:  np.float64 = 0.5  # nm
 massa_particula: np.float64 = 1 * 1.66e-27  # kg (massa do hidrogenio)
 
 tempo_entre_frames: np.float64 = 0.0002 # ns
-tempo_coleta_dados: np.float64 = 20 * tempo_entre_frames # ns
+tempo_coleta_dados: np.float64 = 30 * tempo_entre_frames # ns
 
 temperatura_inicial: np.float64 = 300  # K
 temperatura_maxima:  np.float64 = 1300 # K
 temperatura_minima:  np.float64 = 100  # K
 
-energia_maxima_histograma  = 8e-20 #J
+velocidade_maxima_histograma = 10000 # m/s
 kb: np.float64 = 1.380649e-23  # J/K
 quantas_particulas_adicionar: int = 10 # particulas adicionadas/removidas por clique
+proporcao_considerada_na_temperatura: float = 0.99
+temperatura_aquecimento: float = 20
 
 LARGURA_TELA, ALTURA_TELA = 1200, 900  # tamanho da tela em pixels
-PIXELS_POR_NM = 10  # fator de escala (10 pixels = 1 nm)
-LARGURA_CAIXA: np.float64 = 50 # nm de largura
-ALTURA_CAIXA:  np.float64 = 50 # nm de altura
+PIXELS_POR_NM = 15  # fator de escala (10 pixels = 1 nm)
+LARGURA_CAIXA: np.float64 = 40 # nm de largura
+ALTURA_CAIXA:  np.float64 = 40 # nm de altura
 
 RAIO_PARTICULA_PX = raio_particula * PIXELS_POR_NM
 LARGURA_CAIXA_PX  = LARGURA_CAIXA * PIXELS_POR_NM
@@ -49,7 +51,7 @@ AZUL_CLARO = (100, 150, 255)
 cor_particulas = AZUL_CLARO
 
 # grid para otimizar colisões
-tamanho_celulas: np.float64 = LARGURA_CAIXA / 5
+tamanho_celulas: np.float64 = LARGURA_CAIXA / 10
 
 #Particulas sao dicionarios da forma {x, y, vx, vy, massa, raio}
 class SistemaParticulas:
@@ -64,11 +66,11 @@ class SistemaParticulas:
 
     def velocidade_boltzmann(self, temperatura: np.float64):
         """Gera velocidade em m/s a partir da distribuição de Boltzmann"""
-        
-        media = np.sqrt(np.pi * kb * temperatura / (2 * massa_particula)) # m/s
-        dispersao = np.sqrt((4 - np.pi) * kb * temperatura / (2 * massa_particula)) # m/s
+        sigma = np.sqrt(kb * temperatura / massa_particula)  # m/s
+        # Amostra a magnitude usando a distribuicao de Rayleigh
+        velocidade = sigma * np.sqrt(-2 * np.log(random.random()))
 
-        return random.gauss(media, dispersao)
+        return velocidade #random.gauss(media, dispersao)
     
     def inicializar_particulas(self, quantidade_particulas, temperatura):
         """Cria particulas iniciais nas condições iniciais dadas (quantidade e temperatura)"""
@@ -269,7 +271,7 @@ class SistemaParticulas:
     @property
     def temperatura_medida(self) -> np.float64:
         lista_energias_cineticas = self.energias_cineticas
-        energia_media_medida = np.mean(lista_energias_cineticas[:int(0.95 * self.contagem_particulas)])
+        energia_media_medida = np.mean(lista_energias_cineticas[:int(proporcao_considerada_na_temperatura * self.contagem_particulas)])
         temperatura = energia_media_medida / kb
         return temperatura
     
@@ -309,30 +311,30 @@ class SistemaParticulas:
 # plotagem do histograma
 plt.ioff()
 fig, ax = plt.subplots(figsize=(4, 3), dpi=80)
-fig.subplots_adjust(bottom=0.2)
+fig.subplots_adjust(left=0.15,bottom=0.2)
 canvas = FigureCanvasAgg(fig)
 
-def desenhar_histograma(energias_cineticas, temperatura_atual) -> pygame.Surface:
+def desenhar_histograma(quantidade_particulas, velocidades, temperatura_atual) -> pygame.Surface:
     """Retorna uma superficie com o histograma desenhado"""
     ax.clear()
-    if energias_cineticas:
-        bins = np.linspace(0, energia_maxima_histograma, 20)
-        contagens, bins, patches = ax.hist(energias_cineticas, bins=bins, color='blue', alpha=0.7)
-        
+    if velocidades:
+        bins = np.linspace(0, velocidade_maxima_histograma, 20)
+        contagens, bins, patches = ax.hist(velocidades, bins=bins, color='blue', alpha=0.7, weights=np.ones(quantidade_particulas)/quantidade_particulas)
+
         # distribuicao de Maxwell-Boltzmann
-        if len(energias_cineticas) > 1:
-            kT = temperatura_atual * kb
-            x = np.linspace(0, energia_maxima_histograma, 100)
-            # calcula largura do bin para normalização adequada
-            largura_bin = bins[1] - bins[0]
-            # distribuicao de Maxwell-Boltzmann normalizada corretamente
-            maxwell = (len(energias_cineticas) * largura_bin * (x/(kT**2)) * np.exp(-x/kT))
-            ax.plot(x, maxwell, 'r-', linewidth=2)
+        kT = temperatura_atual * kb
+        m = massa_particula
+        x = np.linspace(0, velocidade_maxima_histograma, 100)
+        dx = bins[1] - bins[0]
+
+        maxwell = m*x/kT * np.exp(-m*x**2/(2*kT)) * dx 
+        ax.plot(x, maxwell, 'r-', linewidth=2)
     
-    ax.set_title('Distribuição de Energia Cinética')
-    ax.set_xlabel('Energia (J)')
-    ax.set_ylabel('Contagem')
-    ax.set_xlim(0, energia_maxima_histograma)
+    ax.set_title('Distribuição de Velocidades')
+    ax.set_xlabel('Velocidade (m/s)')
+    ax.set_ylabel('Frequência')
+    ax.set_xlim(0, velocidade_maxima_histograma)
+    ax.set_ylim(0,0.4)
     
     canvas.draw()
     renderer = canvas.get_renderer()
@@ -381,7 +383,7 @@ def main():
         f"Raio da Partícula: {raio_particula} nm",
         f"Massa da Partícula: {massa_particula:.2e} kg",
         f"Tamanho da Caixa: {LARGURA_CAIXA} nm x {ALTURA_CAIXA} nm",
-        f"Temp. Atual: {sistema_particulas.temperatura_atual:.1f} K",
+        f"Temperatura Atual: {sistema_particulas.temperatura_atual:.1f} K",
         f"Pressão: {ultima_pressao_medida:.2e} N/m",
         f"Espaço: Pausar/Continuar | Esc: Sair"
     ]
@@ -414,15 +416,15 @@ def main():
                     sistema_particulas.remover_particulas(quantas_particulas_adicionar)
 
                 elif retangulo_botao_aquecer.collidepoint(posicao_mouse) and sistema_particulas.temperatura_atual < temperatura_maxima:
-                    sistema_particulas.aquecer(50)  # Aquecer
+                    sistema_particulas.aquecer(temperatura_aquecimento)  # Aquecer
 
                 elif retangulo_botao_resfriar.collidepoint(posicao_mouse) and sistema_particulas.temperatura_atual > temperatura_minima:
-                    sistema_particulas.aquecer(-50)  # Resfriar
+                    sistema_particulas.aquecer(-temperatura_aquecimento)  # Resfriar
     
         if not pausado:
             tempo_ultima_coleta += tempo_entre_frames
             sistema_particulas.atualizar_sistema(tempo_entre_frames)
-            superficie_histograma = desenhar_histograma(sistema_particulas.energias_cineticas, sistema_particulas.temperatura_atual)
+            superficie_histograma = desenhar_histograma(sistema_particulas.contagem_particulas, sistema_particulas.velocidades, sistema_particulas.temperatura_atual)
         
         # limpa a tela
         screen.fill(PRETO)
@@ -442,23 +444,23 @@ def main():
         pygame.draw.rect(screen, BRANCO, (POS_X_CAIXA_PX, POS_Y_CAIXA_PX, LARGURA_CAIXA_PX, ALTURA_CAIXA_PX), 2)
 
         # desenha botoes de controle
-        retangulo_botao_adicionar = desenhar_botao(700, 100, 150, 40, "Adicionar 10 Partículas", len(sistema_particulas.particulas) < max_particulas)
-        retangulo_botao_remover   = desenhar_botao(700, 150, 150, 40, "Remover 10 Partículas",   len(sistema_particulas.particulas) > min_particulas)
-        retangulo_botao_aquecer   = desenhar_botao(700, 200, 150, 40, "Aquecer (+50K)",  sistema_particulas.temperatura_atual < temperatura_maxima)
-        retangulo_botao_resfriar  = desenhar_botao(700, 250, 150, 40, "Resfriar (-50K)", sistema_particulas.temperatura_atual > temperatura_minima)
+        retangulo_botao_adicionar = desenhar_botao(700, 100, 150, 40, f"Adicionar {quantas_particulas_adicionar} Partículas", len(sistema_particulas.particulas) < max_particulas)
+        retangulo_botao_remover   = desenhar_botao(700, 150, 150, 40, f"Remover {quantas_particulas_adicionar} Partículas",   len(sistema_particulas.particulas) > min_particulas)
+        retangulo_botao_aquecer   = desenhar_botao(700, 200, 150, 40, f"Aquecer (+{temperatura_aquecimento} K)",  sistema_particulas.temperatura_atual < temperatura_maxima)
+        retangulo_botao_resfriar  = desenhar_botao(700, 250, 150, 40, f"Resfriar (-{temperatura_aquecimento} K)", sistema_particulas.temperatura_atual > temperatura_minima)
 
         # estatisticas
         if tempo_ultima_coleta > tempo_coleta_dados:
             tempo_ultima_coleta = 0
             ultima_pressao_medida = sistema_particulas.pressao2d(tempo_coleta_dados)
-            ultima_temperatura_medida = sistema_particulas.temperatura_medida
+        ultima_temperatura_medida = sistema_particulas.temperatura_medida
         
         estatisticas = [
             f"Partículas: {sistema_particulas.contagem_particulas}",
             f"Raio da Partícula: {raio_particula} nm",
             f"Massa da Partícula: {massa_particula:.2e} kg",
             f"Tamanho da Caixa: {LARGURA_CAIXA} nm x {ALTURA_CAIXA} nm",
-            f"Temp. Atual: {ultima_temperatura_medida:.1f} K",
+            f"Temperatura Atual: {ultima_temperatura_medida:.1f} K",
             f"Pressão: {ultima_pressao_medida:.2e} N/m",
             f"Espaço: Pausar/Continuar | Esc: Sair"
         ]
@@ -467,11 +469,10 @@ def main():
             screen.blit(fonte.render(estatistica, True, BRANCO), (700, 350 + i * 25))
 
         # Desenha histograma
-        if not pausado:
-            screen.blit(superficie_histograma, (700, 550))
+        screen.blit(superficie_histograma, (700, 550))
         
         pygame.display.flip()
-        clock.tick(60)
+        clock.tick(120)
     
     pygame.quit()
     sys.exit()
