@@ -69,7 +69,7 @@ class SistemaParticulas:
         sigma = np.sqrt(kb * temperatura / massa_particula)  # m/s
         # Amostra a magnitude usando a distribuicao de Rayleigh
         velocidade = sigma * np.sqrt(-2 * np.log(random.random()))
-
+    
         return velocidade #random.gauss(media, dispersao)
     
     def inicializar_particulas(self, quantidade_particulas, temperatura):
@@ -376,14 +376,13 @@ def main():
     # estatisticas iniciais
     tempo_ultima_coleta = 0
     ultima_pressao_medida = sistema_particulas.pressao2d(tempo_coleta_dados)
-    ultima_temperatura_medida = sistema_particulas.temperatura_medida
 
     estatisticas = [
         f"Partículas: {sistema_particulas.contagem_particulas}",
         f"Raio da Partícula: {raio_particula} nm",
         f"Massa da Partícula: {massa_particula:.2e} kg",
         f"Tamanho da Caixa: {LARGURA_CAIXA} nm x {ALTURA_CAIXA} nm",
-        f"Temperatura Atual: {sistema_particulas.temperatura_atual:.1f} K",
+        f"Temperatura Atual: {sistema_particulas.temperatura_atual - 273.15:.1f} °C",
         f"Pressão: {ultima_pressao_medida:.2e} N/m",
         f"Espaço: Pausar/Continuar | Esc: Sair"
     ]
@@ -446,21 +445,20 @@ def main():
         # desenha botoes de controle
         retangulo_botao_adicionar = desenhar_botao(700, 100, 150, 40, f"Adicionar {quantas_particulas_adicionar} Partículas", len(sistema_particulas.particulas) < max_particulas)
         retangulo_botao_remover   = desenhar_botao(700, 150, 150, 40, f"Remover {quantas_particulas_adicionar} Partículas",   len(sistema_particulas.particulas) > min_particulas)
-        retangulo_botao_aquecer   = desenhar_botao(700, 200, 150, 40, f"Aquecer (+{temperatura_aquecimento} K)",  sistema_particulas.temperatura_atual < temperatura_maxima)
-        retangulo_botao_resfriar  = desenhar_botao(700, 250, 150, 40, f"Resfriar (-{temperatura_aquecimento} K)", sistema_particulas.temperatura_atual > temperatura_minima)
+        retangulo_botao_aquecer   = desenhar_botao(700, 200, 150, 40, f"Aquecer (+{temperatura_aquecimento} °C)",  sistema_particulas.temperatura_atual < temperatura_maxima)
+        retangulo_botao_resfriar  = desenhar_botao(700, 250, 150, 40, f"Resfriar (-{temperatura_aquecimento} °C)", sistema_particulas.temperatura_atual > temperatura_minima)
 
         # estatisticas
         if tempo_ultima_coleta > tempo_coleta_dados:
             tempo_ultima_coleta = 0
             ultima_pressao_medida = sistema_particulas.pressao2d(tempo_coleta_dados)
-        ultima_temperatura_medida = sistema_particulas.temperatura_medida
         
         estatisticas = [
             f"Partículas: {sistema_particulas.contagem_particulas}",
             f"Raio da Partícula: {raio_particula} nm",
             f"Massa da Partícula: {massa_particula:.2e} kg",
             f"Tamanho da Caixa: {LARGURA_CAIXA} nm x {ALTURA_CAIXA} nm",
-            f"Temperatura Atual: {ultima_temperatura_medida:.1f} K",
+            f"Temperatura Atual: {sistema_particulas.temperatura_medida - 273.15:.1f} °C",
             f"Pressão: {ultima_pressao_medida:.2e} N/m",
             f"Espaço: Pausar/Continuar | Esc: Sair"
         ]
