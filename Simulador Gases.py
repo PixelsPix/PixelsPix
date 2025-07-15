@@ -30,7 +30,7 @@ temperatura_aquecimento: float = 5
 intervalo_aquecimento: float = 0.01
 
 LARGURA_TELA, ALTURA_TELA = 1200, 900  # tamanho da tela em pixels
-PIXELS_POR_NM = 15  # fator de escala (10 pixels = 1 nm)
+PIXELS_POR_NM = 15  # fator de escala (pixels/nm)
 LARGURA_CAIXA: np.float64 = 40 # nm de largura
 ALTURA_CAIXA:  np.float64 = 40 # nm de altura
 
