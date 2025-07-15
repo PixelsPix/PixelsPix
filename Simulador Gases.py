@@ -15,7 +15,8 @@ raio_particula:  np.float64 = 0.5  # nm
 massa_particula: np.float64 = 1 * 1.66e-27  # kg (massa do hidrogenio)
 
 tempo_entre_frames: np.float64 = 0.0002 # ns
-tempo_coleta_dados: np.float64 = 30 * tempo_entre_frames # ns
+tempo_coleta_pressao: np.float64 = 30 * tempo_entre_frames # ns
+tempo_coleta_temperatura: np.float64 = tempo_coleta_pressao/5 # ns
 
 temperatura_inicial: np.float64 = 300  # K
 temperatura_maxima:  np.float64 = 1300 # K
@@ -378,8 +379,10 @@ def main():
     ultimo_tempo_aquecimento = 0
 
     # estatisticas iniciais
-    tempo_ultima_coleta = 0
-    ultima_pressao_medida = sistema_particulas.pressao2d(tempo_coleta_dados)
+    tempo_ultima_coleta_pressao = 0
+    tempo_ultima_coleta_temperatura = 0
+    ultima_pressao_medida = sistema_particulas.pressao2d(tempo_coleta_pressao)
+    ultima_temperatura_medida = sistema_particulas.temperatura_medida
 
     estatisticas = [
         f"Tempo entre frames: {tempo_entre_frames * 1000} ps por frame",
@@ -387,7 +390,7 @@ def main():
         f"Raio da Partícula: {raio_particula} nm",
         f"Massa da Partícula: {massa_particula:.2e} kg",
         f"Tamanho da Caixa: {LARGURA_CAIXA} nm x {ALTURA_CAIXA} nm",
-        f"Temperatura Atual: {sistema_particulas.temperatura_medida:.1f} K",
+        f"Temperatura Atual: {ultima_temperatura_medida:.1f} K",
         f"Pressão: {ultima_pressao_medida*1e3:.2f} mN/m"
     ]
     
@@ -428,12 +431,15 @@ def main():
         if aquecendo and (tempo_atual - ultimo_tempo_aquecimento > intervalo_aquecimento):
             sistema_particulas.aquecer(temperatura_aquecimento * np.random.uniform(0.7,1.3))
             ultimo_tempo_aquecimento = tempo_atual
+            ultima_temperatura_medida = sistema_particulas.temperatura_medida
         
         if resfriando and (tempo_atual - ultimo_tempo_aquecimento > intervalo_aquecimento):
             sistema_particulas.aquecer(-temperatura_aquecimento * np.random.uniform(0.7,1.3))
             ultimo_tempo_aquecimento = tempo_atual
+            ultima_temperatura_medida = sistema_particulas.temperatura_medida
 
-        tempo_ultima_coleta += tempo_entre_frames
+        tempo_ultima_coleta_pressao += tempo_entre_frames
+        tempo_ultima_coleta_temperatura += tempo_entre_frames
         sistema_particulas.atualizar_sistema(tempo_entre_frames)
         superficie_histograma = desenhar_histograma(sistema_particulas.contagem_particulas, sistema_particulas.velocidades, sistema_particulas.temperatura_atual)
         
@@ -461,17 +467,21 @@ def main():
         retangulo_botao_resfriar  = desenhar_botao(700, 250, 150, 40, f"Resfriar", sistema_particulas.temperatura_atual > 1.01 * temperatura_minima, VERDE_ESCURO if not resfriando else AZUL)
 
         # estatisticas
-        if tempo_ultima_coleta > tempo_coleta_dados:
-            tempo_ultima_coleta = 0
-            ultima_pressao_medida = sistema_particulas.pressao2d(tempo_coleta_dados)
+        if tempo_ultima_coleta_pressao > tempo_coleta_pressao:
+            tempo_ultima_coleta_pressao = 0
+            ultima_pressao_medida = sistema_particulas.pressao2d(tempo_coleta_pressao)
         
+        if tempo_ultima_coleta_temperatura > tempo_coleta_temperatura:
+            tempo_ultima_coleta_temperatura = 0
+            ultima_temperatura_medida = sistema_particulas.temperatura_medida
+
         estatisticas = [
             f"Tempo entre frames: {tempo_entre_frames * 1000} ps por frame",
             f"Partículas: {sistema_particulas.contagem_particulas}",
             f"Raio da Partícula: {raio_particula} nm",
             f"Massa da Partícula: {massa_particula:.2e} kg",
             f"Tamanho da Caixa: {LARGURA_CAIXA} nm x {ALTURA_CAIXA} nm",
-            f"Temperatura Atual: {sistema_particulas.temperatura_medida:.1f} K",
+            f"Temperatura Atual: {ultima_temperatura_medida:.1f} K",
             f"Pressão: {ultima_pressao_medida * 1e3:.2f} mN/m",
         ]
         
