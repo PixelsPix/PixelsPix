@@ -70,9 +70,9 @@ class SistemaParticulas:
         """Gera velocidade em m/s a partir da distribuição de Boltzmann"""
         sigma = np.sqrt(kb * temperatura / massa_particula)  # m/s
         # Amostra a magnitude usando a distribuicao de Rayleigh
-        velocidade = np.random.rayleigh(sigma)
+        velocidade = np.random.rayleigh(sigma) # m/s
     
-        return velocidade #random.gauss(media, dispersao)
+        return velocidade # m/s
     
     def inicializar_particulas(self, quantidade_particulas, temperatura):
         """Cria particulas iniciais nas condições iniciais dadas (quantidade e temperatura)"""
@@ -246,43 +246,43 @@ class SistemaParticulas:
         lista_energias_cineticas = []
 
         for p in self.particulas:
-            velocidade_quadrada = p['vx']**2 + p['vy']**2
-            massa = p['massa']
-            energia_cinetica = 0.5 * massa * velocidade_quadrada
+            velocidade_quadrada = p['vx']**2 + p['vy']**2 # m^2 / s^2
+            massa = p['massa'] # kg
+            energia_cinetica = 0.5 * massa * velocidade_quadrada # J
             lista_energias_cineticas.append(energia_cinetica)
 
-        return lista_energias_cineticas
+        return lista_energias_cineticas # J
 
     @property
     def velocidades(self) -> list[np.float64]:
         lista_velocidades = []
 
         for p in self.particulas:
-            velocidade = np.sqrt(p['vx']**2 + p['vy']**2)
+            velocidade = np.sqrt(p['vx']**2 + p['vy']**2) # m/s
             lista_velocidades.append(velocidade)
 
-        return lista_velocidades
+        return lista_velocidades # m/s
     
     @property
     def temperatura_atual(self) -> np.float64:
-        lista_energias_cineticas = self.energias_cineticas
-        energia_media = np.mean(lista_energias_cineticas)
-        temperatura = energia_media / kb
-        return temperatura
+        lista_energias_cineticas = self.energias_cineticas # J
+        energia_media = np.mean(lista_energias_cineticas) # J
+        temperatura = energia_media / kb # K
+        return temperatura # K
     
     @property
     def temperatura_medida(self) -> np.float64:
-        lista_energias_cineticas = self.energias_cineticas
-        energia_media_medida = np.mean(lista_energias_cineticas[:int(round(proporcao_considerada_na_temperatura * self.contagem_particulas))])
-        temperatura = energia_media_medida / kb
-        return temperatura
+        lista_energias_cineticas = self.energias_cineticas # J
+        energia_media_medida = np.mean(lista_energias_cineticas[:int(round(proporcao_considerada_na_temperatura * self.contagem_particulas))]) # J
+        temperatura = energia_media_medida / kb # K
+        return temperatura # K
     
     def pressao2d(self, tempo_decorrido) -> np.float64:
         area2d_paredes = 2 * (LARGURA_CAIXA + ALTURA_CAIXA) # nm
         forca_aplicada_paredes = self.momento_transferido_paredes / tempo_decorrido # GN
         pressao2d = forca_aplicada_paredes / area2d_paredes * 1e18 # N/m
         self.momento_transferido_paredes = 0
-        return pressao2d
+        return pressao2d # N/m
     
     def aquecer(self, delta_temperatura):
         """Ajusta a temperatura do sistema pelo fator especificado"""
