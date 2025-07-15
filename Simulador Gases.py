@@ -9,7 +9,7 @@ from collections import defaultdict
 # parametros da simulacao
 quantidade_inicial_particulas = 200
 min_particulas = 100
-max_particulas = 350
+max_particulas = 500
 
 raio_particula:  np.float64 = 0.5  # nm
 massa_particula: np.float64 = 1 * 1.66e-27  # kg (massa do hidrogenio)
@@ -472,7 +472,7 @@ def main():
             f"Massa da Partícula: {massa_particula:.2e} kg",
             f"Tamanho da Caixa: {LARGURA_CAIXA} nm x {ALTURA_CAIXA} nm",
             f"Temperatura Atual: {sistema_particulas.temperatura_medida:.1f} K",
-            f"Pressão: {ultima_pressao_medida * 1e3:.2f} mN/m"
+            f"Pressão: {ultima_pressao_medida * 1e3:.2f} mN/m",
         ]
         
         for i, estatistica in enumerate(estatisticas):
