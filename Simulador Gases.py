@@ -54,7 +54,26 @@ AZUL_CLARO = (100, 150, 255)
 cor_particulas = AZUL_CLARO
 
 # grid para otimizar colisões
-tamanho_celulas: np.float64 = LARGURA_CAIXA / 20
+"""
+A funcao de distribuicao de velocidades de maxwell-boltzmann pode ser escrita como:
+p(V) = mV / kT * exp(-m V^2 / kT)
+
+Com isso, podemos calcular a probabilidade que uma velocidade esteja entre 0 e uma velocidade Vmax:
+integral p(V) dV = - exp(-m V^2 / kT)
+probabilidade(0 < V < Vmax) = 1 - exp(-m Vmax^2 / kT)
+
+Assim, podemos definir Vmax como a velocidade que faz a probabilidade(0 < V < Vmax) = 0.995, por exemplo
+1 - exp(m Vmax^2 / kT) = 0.995
+Vmax = sqrt( kT/m * ln[1/(1-0.995)] )
+
+Adicionando um fator de seguranca de 2 na velocidade para nenhuma colisao ser perdida, podemos calcular o deslocamento max de uma particula em um frame
+desloc_max = 2 * Vmax * tempo_entre_frames
+
+E esse eh o tamanho ideal para o tamanho das celulas de discretizacao de forma a manter todas as colisoes 
+"""
+
+velocidade_maxima: np.float64 = 2 * np.sqrt(kb*temperatura_maxima/massa_particula * np.log(1/(1-0.995))) # m/s
+tamanho_celulas: np.float64 = velocidade_maxima * tempo_entre_frames # nm
 
 #Particulas sao dicionarios da forma {x, y, vx, vy, massa, raio}
 class SistemaParticulas:
