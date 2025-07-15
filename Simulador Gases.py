@@ -54,7 +54,7 @@ AZUL_CLARO = (100, 150, 255)
 cor_particulas = AZUL_CLARO
 
 # grid para otimizar colisões
-tamanho_celulas: np.float64 = LARGURA_CAIXA / 10
+tamanho_celulas: np.float64 = LARGURA_CAIXA / 20
 
 #Particulas sao dicionarios da forma {x, y, vx, vy, massa, raio}
 class SistemaParticulas:
