@@ -16,7 +16,7 @@ massa_particula: np.float64 = 1 * 1.66e-27  # kg (massa do hidrogenio)
 
 tempo_entre_frames: np.float64 = 0.0002 # ns
 tempo_coleta_pressao: np.float64 = 30 * tempo_entre_frames # ns
-tempo_coleta_temperatura: np.float64 = tempo_coleta_pressao/5 # ns
+tempo_coleta_temperatura: np.float64 = tempo_coleta_pressao/2 # ns
 
 temperatura_inicial: np.float64 = 300  # K
 temperatura_maxima:  np.float64 = 1300 # K
@@ -298,7 +298,7 @@ class SistemaParticulas:
         return temperatura # K
     
     def pressao2d(self, tempo_decorrido) -> np.float64:
-        area2d_paredes = 2 * (LARGURA_CAIXA + ALTURA_CAIXA) # nm
+        area2d_paredes = 2 * (LARGURA_CAIXA + ALTURA_CAIXA - 4 * raio_particula) # nm (area acessivel)
         forca_aplicada_paredes = self.momento_transferido_paredes / tempo_decorrido # GN
         pressao2d = forca_aplicada_paredes / area2d_paredes * 1e18 # N/m
         self.momento_transferido_paredes = 0
