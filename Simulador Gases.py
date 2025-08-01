@@ -359,11 +359,10 @@ def desenhar_histograma(quantidade_particulas, velocidades, temperatura_atual) -
     ax.set_ylim(0,0.4)
     
     canvas.draw()
-    renderer = canvas.get_renderer()
-    raw_data = renderer.tostring_rgb()
+    raw_data = canvas.buffer_rgba()
     size = canvas.get_width_height()
     
-    return pygame.image.fromstring(raw_data, size, "RGB")
+    return pygame.image.frombuffer(raw_data, size, "RGBA")
 
 # loop simulacao
 pygame.init()
