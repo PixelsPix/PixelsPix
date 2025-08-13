@@ -29,16 +29,16 @@ proporcao_considerada_na_temperatura: float = 0.995
 temperatura_aquecimento: float = 5
 intervalo_aquecimento: float = 0.01
 
-LARGURA_TELA, ALTURA_TELA = 1200, 900  # tamanho da tela em pixels
-PIXELS_POR_NM = 15  # fator de escala (pixels/nm)
-LARGURA_CAIXA: np.float64 = 40 # nm de largura
-ALTURA_CAIXA:  np.float64 = 40 # nm de altura
+LARGURA_TELA, ALTURA_TELA = 1200, 650  # tamanho da tela em pixels
+PIXELS_POR_NM = 10  # fator de escala (pixels/nm)
+LARGURA_CAIXA: np.float64 = 50 # nm de largura
+ALTURA_CAIXA:  np.float64 = 50 # nm de altura
 
 RAIO_PARTICULA_PX = raio_particula * PIXELS_POR_NM
 LARGURA_CAIXA_PX  = LARGURA_CAIXA * PIXELS_POR_NM
 ALTURA_CAIXA_PX   = ALTURA_CAIXA * PIXELS_POR_NM
 
-POS_X_CAIXA_PX, POS_Y_CAIXA_PX = 350 - int(LARGURA_CAIXA_PX/2), 450 - int(ALTURA_CAIXA_PX/2)  # posicao da caixa na tela em pixels
+POS_X_CAIXA_PX, POS_Y_CAIXA_PX = 350 - int(LARGURA_CAIXA_PX/2), 350 - int(ALTURA_CAIXA_PX/2) # 350 - int(LARGURA_CAIXA_PX/2), 450 - int(ALTURA_CAIXA_PX/2)  # posicao da caixa na tela em pixels
 
 # Cores
 BRANCO = (255, 255, 255)
@@ -374,7 +374,8 @@ sistema_particulas = SistemaParticulas(quantidade_inicial_particulas, temperatur
 screen = pygame.display.set_mode((LARGURA_TELA, ALTURA_TELA))
 pygame.display.set_caption("Simulador de Partículas de Gás Ideal")
 clock = pygame.time.Clock()
-fonte = pygame.font.SysFont('Arial', 16)
+fonte = pygame.font.SysFont('Arial', 16, bold=True)
+fonte_negrito = pygame.font.SysFont('Arial', 16, bold=True)
 fonte_titulo = pygame.font.SysFont('Arial', 24, bold=True)
 
 # funcao pra desenhar botoes
@@ -385,7 +386,7 @@ def desenhar_botao(x, y, largura, altura, texto, ativo=True, cor=VERDE_ESCURO):
     pygame.draw.rect(screen, cor_botao, (x, y, largura, altura))
     pygame.draw.rect(screen, BRANCO, (x, y, largura, altura), 2)
 
-    texto_surperficie = fonte.render(texto, True, BRANCO)
+    texto_surperficie = fonte_negrito.render(texto, True, BRANCO)
     texto_retangulo = texto_surperficie.get_rect(center=(x + largura/2, y + altura/2))
     screen.blit(texto_surperficie, texto_retangulo)
     return pygame.Rect(x, y, largura, altura)
@@ -459,7 +460,7 @@ def main():
         tempo_ultima_coleta_pressao += tempo_entre_frames
         tempo_ultima_coleta_temperatura += tempo_entre_frames
         sistema_particulas.atualizar_sistema(tempo_entre_frames)
-        superficie_histograma = desenhar_histograma(sistema_particulas.contagem_particulas, sistema_particulas.velocidades, sistema_particulas.temperatura_atual)
+        # superficie_histograma = desenhar_histograma(sistema_particulas.contagem_particulas, sistema_particulas.velocidades, sistema_particulas.temperatura_atual)
         
         # limpa a tela
         screen.fill(PRETO)
@@ -479,10 +480,10 @@ def main():
         pygame.draw.rect(screen, BRANCO, (POS_X_CAIXA_PX, POS_Y_CAIXA_PX, LARGURA_CAIXA_PX, ALTURA_CAIXA_PX), 2)
 
         # desenha botoes de controle
-        retangulo_botao_adicionar = desenhar_botao(700, 100, 150, 40, f"Adicionar {quantas_particulas_adicionar} Partículas", len(sistema_particulas.particulas) < max_particulas)
-        retangulo_botao_remover   = desenhar_botao(700, 150, 150, 40, f"Remover {quantas_particulas_adicionar} Partículas",   len(sistema_particulas.particulas) > min_particulas)
-        retangulo_botao_aquecer   = desenhar_botao(700, 200, 150, 40, f"Aquecer",  sistema_particulas.temperatura_atual < 0.99 * temperatura_maxima, VERDE_ESCURO if not aquecendo  else LARANJA)
-        retangulo_botao_resfriar  = desenhar_botao(700, 250, 150, 40, f"Resfriar", sistema_particulas.temperatura_atual > 1.01 * temperatura_minima, VERDE_ESCURO if not resfriando else AZUL)
+        retangulo_botao_adicionar = desenhar_botao(700, 100, 220, 40, f"Adicionar {quantas_particulas_adicionar} Partículas", len(sistema_particulas.particulas) < max_particulas)
+        retangulo_botao_remover   = desenhar_botao(700, 150, 220, 40, f"Remover {quantas_particulas_adicionar} Partículas",   len(sistema_particulas.particulas) > min_particulas)
+        retangulo_botao_aquecer   = desenhar_botao(700, 200, 220, 40, f"Aquecer",  sistema_particulas.temperatura_atual < 0.99 * temperatura_maxima, VERDE_ESCURO if not aquecendo  else LARANJA)
+        retangulo_botao_resfriar  = desenhar_botao(700, 250, 220, 40, f"Resfriar", sistema_particulas.temperatura_atual > 1.01 * temperatura_minima, VERDE_ESCURO if not resfriando else AZUL)
 
         # estatisticas
         if tempo_ultima_coleta_pressao > tempo_coleta_pressao:
@@ -507,10 +508,10 @@ def main():
             screen.blit(fonte.render(estatistica, True, BRANCO), (700, 350 + i * 25))
 
         # Desenha histograma
-        screen.blit(superficie_histograma, (700, 550))
+        # screen.blit(superficie_histograma, (700, 550))
         
         pygame.display.flip()
-        clock.tick(120)
+        clock.tick(30)
     
     pygame.quit()
     sys.exit()
