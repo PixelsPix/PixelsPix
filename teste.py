@@ -76,10 +76,10 @@ def add_bias_column(X):
 def forward(X, W1, W2):
     Xb = add_bias_column(X)
     Z1 = Xb @ W1.T
-    A1 = list(map(leaky_ReLU, Z1))
+    A1 = [leaky_ReLU(z) for z in Z1] # list(map(leaky_ReLU, Z1))
     A1b = add_bias_column(A1)
     Z2 = A1b @ W2.T
-    Yhat = list(map(leaky_ReLU, Z2))
+    Yhat = [leaky_ReLU(z) for z in Z2] # list(map(leaky_ReLU, Z2))
     cache = (Xb, Z1, A1, A1b, Z2, Yhat)
     return Yhat, cache
 
