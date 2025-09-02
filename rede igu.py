@@ -29,14 +29,10 @@ dados = np.array(dados)
 
 # Bloco 2 - normalização dos dados e separação de entrada/saída
 def leaky_ReLU(x):
-    if(x>0):
-        return x
-    return 0.01 * x
+    return np.where(x > 0, x, 0.01 * x)
 
 def leaky_ReLU_derivada(x):
-    if(x>0):
-        return 1
-    return 0.01
+    return np.where(x > 0, 1, 0.01)
 
 entrada = dados[:, 0:2]  # TRS e WS
 saida = dados[:, 2:]     # 5 propriedades
@@ -65,7 +61,7 @@ in_min, in_max = entrada.min(axis=0), entrada.max(axis=0)
 out_min, out_max = saida.min(axis=0), saida.max(axis=0)
 
 # Bloco 4 - definição da arquitetura da rede e inicialização dos pesos
-n_in, n_hidden, n_out = 2, 9, 5
+n_in, n_hidden, n_out = 2, 10, 5
 W1 = np.random.uniform(-1, 1, size=(n_hidden, n_in+1))
 W2 = np.random.uniform(-1, 1, size=(n_out,   n_hidden+1))
 
@@ -76,10 +72,10 @@ def add_bias_column(X):
 def forward(X, W1, W2):
     Xb = add_bias_column(X)
     Z1 = Xb @ W1.T
-    A1 = [leaky_ReLU(z) for z in Z1] # list(map(leaky_ReLU, Z1))
+    A1 = leaky_ReLU(Z1)
     A1b = add_bias_column(A1)
     Z2 = A1b @ W2.T
-    Yhat = [leaky_ReLU(z) for z in Z2] # list(map(leaky_ReLU, Z2))
+    Yhat = leaky_ReLU(Z2)
     cache = (Xb, Z1, A1, A1b, Z2, Yhat)
     return Yhat, cache
 
@@ -95,8 +91,8 @@ lr = 0.02
 def train_one_sample(x, t, W1, W2):
     yhat, (Xb, Z1, A1, A1b, Z2, Yhat) = forward(x[None, :], W1, W2)
     e = (yhat - t[None, :])
-    delta2 = e * Yhat * (1 - Yhat)
-    delta1 = (delta2 @ W2[:, :-1]) * A1 * (1 - A1)
+    delta2 = e * leaky_ReLU_derivada(Z2)
+    delta1 = (delta2 @ W2[:, :-1]) * leaky_ReLU_derivada(Z1)
     dW2 = delta2.T @ A1b
     dW1 = delta1.T @ Xb
     W2 = W2 - lr * dW2
