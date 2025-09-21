@@ -16,4 +16,4 @@ You can click the Preview link to take a look at your changes.
 - I'm currently a Mechanical Engineering major, with a great interest in fluid flow and thermodynamics.
 
 I mostly just watch youtube all day tbh, so a fun fact is that I watch youtube all day?
-For now I'm just trying to learn how to code, but if you want to contact me for some reason, please email me at pixiedavina09@gmail.com and I'll reply! ^^
+For now I'm just trying to learn how to code, but if you want to contact me for some reason, please email me at littlecookie1311@gmail.com and I'll reply!
