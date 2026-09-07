@@ -44,21 +44,37 @@ class SimuladorTrelica:
     Convenção angular:
         theta = ângulo orientado em relação à horizontal.
 
-    A convenção permite ângulos entre 0 e 180 graus. Assim, uma barra
-    pode estar à esquerda ou à direita da projeção vertical do furo.
+    Convenção angular:
+        theta_1, theta_2 e phi são ângulos convencionais, medidos
+        positivamente no sentido anti-horário a partir do eixo +x.
+
+    Na geometria de referência, o ponto de aplicação da força é
+        P = (0, h_h)
+    e os apoios das barras estão sobre o eixo x. Portanto, para uma
+    barra com 0 < theta < 180 graus, sua coordenada do apoio é
+
+        x_apoio = -h_h / tan(theta).
+
+    Assim, barras com theta < 90 graus ficam à esquerda de P, enquanto
+    barras com theta > 90 graus ficam à direita. Isso permite investigar
+    a passagem de uma inclinação para a outra sem mudar a convenção.
 
     Convenção dos esforços:
         N > 0 -> tração
         N < 0 -> compressão
 
-    A força é definida por:
-        theta_f = 0 graus -> força para a direita
-        theta_f = 180 graus -> força para a esquerda
+    Convenção da força:
+        phi = 0 graus   -> F aponta para +x
+        phi = 90 graus  -> F aponta para +y
+        phi = 180 graus -> F aponta para -x
 
-    Se a sua convenção de desenho usar a seta da força para a esquerda
-    como theta_f = 0 graus, basta deslocar os theta_f usados na entrada
-    de acordo com essa convenção; as equações internas permanecem as
-    mesmas.
+    As fórmulas analíticas usadas para os esforços são:
+
+        N1 = F * sin(theta2 - phi) / sin(theta2 - theta1)
+        N2 = F * sin(phi - theta1) / sin(theta2 - theta1)
+
+    Elas são obtidas do equilíbrio do nó P com a convenção de sinais
+    acima.
     """
 
     def __init__(
@@ -103,7 +119,7 @@ class SimuladorTrelica:
             np.arange(*angulos_forca_deg)
         )
 
-        # Para L = h/sin(theta), evitamos theta próximo de 0 ou 180 graus.
+        # Para L = h/|sin(theta)|, evitamos theta próximo de 0 ou 180 graus.
         if np.any(np.isclose(np.sin(self.theta_barras_rad), 0.0)):
             raise ValueError(
                 "Ângulos das barras muito próximos de 0 ou 180 graus "
@@ -142,11 +158,11 @@ class SimuladorTrelica:
         """
         Comprimentos das barras.
 
-        L = h / sin(theta)
+        Como theta é o ângulo da reta suporte em relação ao +x:
 
-        Os ângulos são orientados em relação à horizontal.
+            L = h / sin(theta), 0° < theta < 180°
         """
-        return self.h / np.abs(np.sin(self.theta_barras_rad))
+        return self.h / np.sin(self.theta_barras_rad)
 
     @property
     def coord_barras_chao(self) -> NDArray:
@@ -154,38 +170,35 @@ class SimuladorTrelica:
         Coordenadas horizontais dos pontos onde as barras encontram
         o chão, tomando a projeção vertical do furo como x = 0.
 
-        x = h / tan(theta)
+        Pela geometria da figura:
 
-        O sinal indica o lado do furo.
-        """
-        return self.h / np.tan(self.theta_barras_rad)
+            x_apoio = -h / tan(theta)
+
+        Portanto:
+            theta < 90° -> apoio à esquerda (x < 0)
+            theta > 90° -> apoio à direita (x > 0)
+            theta = 90° -> apoio exatamente abaixo de P (x = 0)
+                """
+        return -self.h / np.tan(self.theta_barras_rad)
 
     @property
     def distancia_frontal(self) -> float:
         """
-        Distância entre a projeção vertical do furo e o ponto de apoio
-        mais à esquerda.
+        Distância horizontal entre a projeção vertical do furo e o apoio
+        mais próximo.
 
-        Para uma geometria com um apoio de cada lado do furo:
-            distancia_frontal = -min(x1, x2)
+        Esta grandeza é usada como interpretação de b_h para impor uma
+        distância mínima do furo à base.
         """
-        return float(-np.min(self.coord_barras_chao))
+        return float(np.min(np.abs(self.coord_barras_chao)))
 
     def geometria_valida(self) -> bool:
         """
         Verifica condições geométricas básicas.
 
-        1. Os apoios devem ficar em lados opostos da projeção do furo.
-        2. Se b_h_min foi fornecido, o apoio mais à esquerda deve estar
+        1. Se b_h_min foi fornecido, o apoio mais à esquerda deve estar
            pelo menos b_h_min distante da projeção do furo.
         """
-        x1, x2 = self.coord_barras_chao
-
-        apoios_opostos = (x1 < 0.0) and (x2 > 0.0)
-
-        if not apoios_opostos:
-            return False
-
         if self.b_h_min is not None:
             if self.distancia_frontal < self.b_h_min:
                 return False
@@ -294,15 +307,9 @@ class SimuladorTrelica:
         N_comp = np.maximum(-N, 0.0)
 
         largura = (
-            12.0
-            * self.SF
-            * N_comp
-            * (self.K * L[None, :]) ** 2
-            / (
-                np.pi**2
-                * E
-                * t**3
-            )
+            (12.0 * self.SF * N_comp * (self.K * L[None, :]) ** 2)
+            / 
+            (np.pi**2 * E * t**3)
         )
 
         return largura
@@ -386,8 +393,7 @@ class SimuladorTrelica:
 def varrer_angulos(
     altura_furo: float,
     forca: float,
-    theta1_deg: NDArray,
-    theta2_deg: NDArray,
+    thetas_deg: NDArray,
     angulos_forca_deg: tuple[float, float, float] = (-30.0, 30.1, 5.0),
     propriedades: dict = PROPRIEDADES_CHAPA,
     fator_seguranca: float = 1.5,
@@ -397,8 +403,7 @@ def varrer_angulos(
     """
     Testa todas as combinações de theta1 e theta2.
 
-    Uma configuração só é aceita se os dois apoios ficarem em lados
-    opostos da projeção vertical do furo e se a restrição b_h_min,
+    Uma configuração só é aceita se a restrição b_h_min,
     quando fornecida, for satisfeita.
 
     O custo de uma configuração é o pior caso de área de material
@@ -407,11 +412,12 @@ def varrer_angulos(
 
     resultados = []
 
-    for theta1 in theta1_deg:
-        for theta2 in theta2_deg:
+    for theta1 in thetas_deg[:-1]:
+        thetas_livres = thetas_deg[thetas_deg > theta1]
 
+        for theta2 in thetas_livres:
             try:
-                sim = SimuladorTrelica(
+                simulador = SimuladorTrelica(
                     altura_furo=altura_furo,
                     forca=forca,
                     angulos_barras_deg=(theta1, theta2),
@@ -421,13 +427,14 @@ def varrer_angulos(
                     fator_k_flambagem=fator_k_flambagem,
                     b_h_min=b_h_min,
                 )
+
             except ValueError:
                 continue
 
-            if not sim.geometria_valida():
+            if not simulador.geometria_valida():
                 continue
 
-            df = sim.resultados()
+            df = simulador.resultados()
 
             # Critério conservador:
             # a geometria deve ser dimensionada para o pior caso de carga.
@@ -437,11 +444,11 @@ def varrer_angulos(
                 "theta1_deg": theta1,
                 "theta2_deg": theta2,
 
-                "x1_m": sim.coord_barras_chao[0],
-                "x2_m": sim.coord_barras_chao[1],
+                "x1_m": simulador.coord_barras_chao[0],
+                "x2_m": simulador.coord_barras_chao[1],
 
-                "L1_m": sim.comprimentos_barras[0],
-                "L2_m": sim.comprimentos_barras[1],
+                "L1_m": simulador.comprimentos_barras[0],
+                "L2_m": simulador.comprimentos_barras[1],
 
                 "area_pior_caso_m2": df.loc[
                     idx_pior, "area_material_m2"
@@ -479,15 +486,15 @@ if __name__ == "__main__":
     # PARÂMETROS DO PROBLEMA
     # ---------------------------------------------------------------
 
-    h_h = 0.100       # m
-    F = 1000.0        # N
+    h_h = 0.035 # m
+    F = 300.0   # N
 
     SF = 1.5
-    K = 1.0
+    K = 1.0  # Fator K de flambagem
 
-    # Se b_h representar a distância mínima do furo até o apoio
-    # mais à esquerda:
-    b_h = 0.020       # m
+    # Distância mínima entre a projeção vertical do furo e o apoio
+    # mais próximo:
+    b_h = 0.020  # m
 
     # Forças de -30° a +30°, em passos de 5°.
     # Ajuste a convenção de theta_f conforme a sua definição angular.
@@ -497,13 +504,13 @@ if __name__ == "__main__":
     # VARREDURA
     # ---------------------------------------------------------------
 
-    angulos = np.arange(10.0, 171.0, 1.0)
+    # 5° a 175° permite investigar os dois lados da vertical.
+    angulos = np.arange(5.0, 100.1, 1.0)
 
     resultados = varrer_angulos(
         altura_furo=h_h,
         forca=F,
-        theta1_deg=angulos,
-        theta2_deg=angulos,
+        thetas_deg=angulos,
         angulos_forca_deg=angulos_forca,
         propriedades=PROPRIEDADES_CHAPA,
         fator_seguranca=SF,
